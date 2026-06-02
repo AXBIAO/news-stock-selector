@@ -251,18 +251,7 @@ xueqiu (实时, 4次重试)
 
 ## 安装方式
 
-### 快速安装（各平台一句话命令）
-
-| 平台 | 安装命令 |
-|------|----------|
-| **Claude Code** | `git clone https://github.com/AXBIAO/news-stock-selector.git ~/.claude/skills/news-stock-selector && pip install tushare akshare requests` |
-| **Codex** | `git clone https://github.com/AXBIAO/news-stock-selector.git ~/.codex/skills/news-stock-selector && pip install tushare akshare requests` |
-| **Cursor** | `git clone https://github.com/AXBIAO/news-stock-selector.git ~/.cursor/skills/news-stock-selector && pip install tushare akshare requests` |
-| **Gemini CLI** | `git clone https://github.com/AXBIAO/news-stock-selector.git ~/.gemini/skills/news-stock-selector && pip install tushare akshare requests` |
-| **Hermes** | `git clone https://github.com/AXBIAO/news-stock-selector.git ~/.hermes/skills/news-stock-selector && pip install tushare akshare requests` |
-| **OpenClaw** | `git clone https://github.com/AXBIAO/news-stock-selector.git ~/.openclaw/skills/news-stock-selector && pip install tushare akshare requests` |
-
-> 安装后配置 TuShare 环境变量即可使用，详见下方环境变量章节。
+快速安装：直接把仓库地址(https://github.com/AXBIAO/news-stock-selector)丢给你的agent助手，让它帮你安装。
 
 ### 脚本安装
 
@@ -457,11 +446,13 @@ news-stock-selector/
 
 ---
 
-## 贡献者 (Contributors)
+## 测试交流群
 
-| 贡献者 | 角色 |
-|--------|------|
-| [AXBIAO](https://github.com/AXBIAO) | 文档编写 |
+有兴趣的可以一起聊聊，有时间会更新
+
+![Uploading 62059b3f469982f8cb37baa4b840b59d.jpg…]()
+
+
 
 ---
 
