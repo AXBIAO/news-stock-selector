@@ -251,7 +251,20 @@ xueqiu (实时, 4次重试)
 
 ## 安装方式
 
-### 一键安装
+### 快速安装（各平台一句话命令）
+
+| 平台 | 安装命令 |
+|------|----------|
+| **Claude Code** | `git clone https://github.com/AXBIAO/news-stock-selector.git ~/.claude/skills/news-stock-selector && pip install tushare akshare requests` |
+| **Codex** | `git clone https://github.com/AXBIAO/news-stock-selector.git ~/.codex/skills/news-stock-selector && pip install tushare akshare requests` |
+| **Cursor** | `git clone https://github.com/AXBIAO/news-stock-selector.git ~/.cursor/skills/news-stock-selector && pip install tushare akshare requests` |
+| **Gemini CLI** | `git clone https://github.com/AXBIAO/news-stock-selector.git ~/.gemini/skills/news-stock-selector && pip install tushare akshare requests` |
+| **Hermes** | `git clone https://github.com/AXBIAO/news-stock-selector.git ~/.hermes/skills/news-stock-selector && pip install tushare akshare requests` |
+| **OpenClaw** | `git clone https://github.com/AXBIAO/news-stock-selector.git ~/.openclaw/skills/news-stock-selector && pip install tushare akshare requests` |
+
+> 安装后配置 TuShare 环境变量即可使用，详见下方环境变量章节。
+
+### 脚本安装
 
 **Linux / macOS:**
 ```bash
