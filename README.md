@@ -251,7 +251,7 @@ xueqiu (实时, 4次重试)
 
 ## 安装方式
 
-快速安装：直接把仓库地址(https://github.com/AXBIAO/news-stock-selector)，丢给你的agent助手，让它帮你安装。
+快速安装：直接把仓库地址，丢给你的agent助手，让它帮你安装。
 
 ### 脚本安装
 
