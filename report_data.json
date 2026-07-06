@@ -1,0 +1,478 @@
+{
+  "query": "完整扫描·事件驱动·全市场",
+  "date": "20260703",
+  "stocks": [
+    {
+      "code": "688766",
+      "name": "普冉股份",
+      "tier": 1,
+      "price": 815.88,
+      "chg": 3.99,
+      "sector": "存储/NOR",
+      "strategy": "催化剂博弈",
+      "tier_score": 0.784,
+      "news": "NOR Flash涨价30-40%+存储龙头+大摩上调目标价",
+      "limit_up": false,
+      "sentiment": 5,
+      "three_high": 8.5
+    },
+    {
+      "code": "688652",
+      "name": "京仪装备",
+      "tier": 1,
+      "price": 193.49,
+      "chg": -1.71,
+      "sector": "半导体设备",
+      "strategy": "催化剂博弈",
+      "tier_score": 0.758,
+      "news": "半导体温控设备龙头+国产替代加速+政策支持",
+      "limit_up": false,
+      "sentiment": 5,
+      "three_high": 9.0
+    },
+    {
+      "code": "688981",
+      "name": "中芯国际",
+      "tier": 1,
+      "price": 140.31,
+      "chg": -2.63,
+      "sector": "晶圆代工",
+      "strategy": "催化剂博弈",
+      "tier_score": 0.735,
+      "news": "中国最大晶圆厂+先进制程突破+华为麒麟量产验证",
+      "limit_up": false,
+      "sentiment": 5,
+      "three_high": 9.0
+    },
+    {
+      "code": "688256",
+      "name": "寒武纪",
+      "tier": 1,
+      "price": 1353.0,
+      "chg": -1.38,
+      "sector": "AI芯片",
+      "strategy": "催化剂博弈",
+      "tier_score": 0.728,
+      "news": "AI算力龙头+昆仑芯IPO映射+国产替代+机构坚守",
+      "limit_up": false,
+      "sentiment": 5,
+      "three_high": 9.5
+    },
+    {
+      "code": "688578",
+      "name": "艾为电子",
+      "tier": 2,
+      "price": 130.88,
+      "chg": 0.01,
+      "sector": "模拟芯片",
+      "strategy": "催化剂博弈",
+      "tier_score": 0.592,
+      "news": "模拟IC龙头+国产替代+消费电子复苏",
+      "limit_up": false,
+      "sentiment": 4,
+      "three_high": 7.0
+    },
+    {
+      "code": "601991",
+      "name": "大唐发电",
+      "tier": 2,
+      "price": 7.67,
+      "chg": 4.64,
+      "sector": "电力",
+      "strategy": "催化剂博弈",
+      "tier_score": 0.589,
+      "news": "夏季用电高峰+电力改革+高分红预期",
+      "limit_up": false,
+      "sentiment": 4,
+      "three_high": 5.5
+    },
+    {
+      "code": "688728",
+      "name": "格科微",
+      "tier": 2,
+      "price": 23.17,
+      "chg": -5.27,
+      "sector": "CIS芯片",
+      "strategy": "回调低吸",
+      "tier_score": 0.57,
+      "news": "CMOS图像传感器龙头+前期20cm涨停后技术回调",
+      "limit_up": false,
+      "sentiment": 4,
+      "three_high": 7.0
+    },
+    {
+      "code": "600584",
+      "name": "长电科技",
+      "tier": 2,
+      "price": 90.88,
+      "chg": -5.31,
+      "sector": "封测",
+      "strategy": "回调低吸",
+      "tier_score": 0.552,
+      "news": "78亿新厂投资+封测龙头+前期翻倍后健康回调",
+      "limit_up": false,
+      "sentiment": 4,
+      "three_high": 7.5
+    },
+    {
+      "code": "688432",
+      "name": "有研硅",
+      "tier": 2,
+      "price": 42.19,
+      "chg": -8.1,
+      "sector": "半导体硅片",
+      "strategy": "回调低吸",
+      "tier_score": 0.52,
+      "news": "大硅片国产化+产能扩张+前期涨停后回调",
+      "limit_up": false,
+      "sentiment": 4,
+      "three_high": 7.5
+    },
+    {
+      "code": "688106",
+      "name": "金宏气体",
+      "tier": 2,
+      "price": 40.0,
+      "chg": -16.21,
+      "sector": "电子气体",
+      "strategy": "回调低吸",
+      "tier_score": 0.5,
+      "news": "电子特气龙头+国产替代+前期20cm涨停后深度回调",
+      "limit_up": false,
+      "sentiment": 4,
+      "three_high": 6.5
+    },
+    {
+      "code": "688160",
+      "name": "步科股份",
+      "tier": 2,
+      "price": 137.0,
+      "chg": 2.24,
+      "sector": "人形机器人",
+      "strategy": "突破追击",
+      "tier_score": 0.48,
+      "news": "机器人伺服驱动+产能扩张+人形机器人产业链",
+      "limit_up": false,
+      "sentiment": 4,
+      "three_high": 7.5
+    },
+    {
+      "code": "002747",
+      "name": "埃斯顿",
+      "tier": 3,
+      "price": 44.77,
+      "chg": 10.0,
+      "sector": "人形机器人",
+      "strategy": "突破追击",
+      "tier_score": 0.681,
+      "news": "特斯拉Optimus产线+宇树IPO+政策+4天3板 涨停熔断",
+      "limit_up": true,
+      "sentiment": 3,
+      "three_high": 7.5
+    },
+    {
+      "code": "300503",
+      "name": "昊志机电",
+      "tier": 3,
+      "price": 111.0,
+      "chg": 16.99,
+      "sector": "半导体设备",
+      "strategy": "突破追击",
+      "tier_score": 0.618,
+      "news": "半导体设备主轴龙头+国产替代 涨停熔断",
+      "limit_up": true,
+      "sentiment": 3,
+      "three_high": 9.0
+    },
+    {
+      "code": "300223",
+      "name": "北京君正",
+      "tier": 3,
+      "price": 259.56,
+      "chg": 10.61,
+      "sector": "存储/计算",
+      "strategy": "突破追击",
+      "tier_score": 0.615,
+      "news": "存储涨价+AI算力芯片+成交144亿全市第一 涨停熔断",
+      "limit_up": true,
+      "sentiment": 3,
+      "three_high": 8.0
+    },
+    {
+      "code": "300718",
+      "name": "长盛轴承",
+      "tier": 3,
+      "price": 77.23,
+      "chg": 20.0,
+      "sector": "人形机器人",
+      "strategy": "突破追击",
+      "tier_score": 0.588,
+      "news": "机器人核心部件+国产替代+20cm涨停 涨停熔断",
+      "limit_up": true,
+      "sentiment": 3,
+      "three_high": 7.5
+    },
+    {
+      "code": "002472",
+      "name": "双环传动",
+      "tier": 3,
+      "price": 47.01,
+      "chg": 9.99,
+      "sector": "人形机器人",
+      "strategy": "突破追击",
+      "tier_score": 0.588,
+      "news": "RV减速器龙头+特斯拉Optimus核心供应商 涨停熔断",
+      "limit_up": true,
+      "sentiment": 3,
+      "three_high": 7.5
+    },
+    {
+      "code": "300660",
+      "name": "雷赛智能",
+      "tier": 3,
+      "price": 33.29,
+      "chg": 14.36,
+      "sector": "人形机器人",
+      "strategy": "突破追击",
+      "tier_score": 0.588,
+      "news": "一字涨停连续2日+运动控制龙头 涨停熔断",
+      "limit_up": true,
+      "sentiment": 3,
+      "three_high": 7.5
+    },
+    {
+      "code": "300580",
+      "name": "贝斯特",
+      "tier": 3,
+      "price": 25.96,
+      "chg": 20.02,
+      "sector": "人形机器人",
+      "strategy": "突破追击",
+      "tier_score": 0.572,
+      "news": "特斯拉供应链+机器人精密件+20cm涨停 涨停熔断",
+      "limit_up": true,
+      "sentiment": 3,
+      "three_high": 7.5
+    },
+    {
+      "code": "601100",
+      "name": "恒立液压",
+      "tier": 3,
+      "price": 121.66,
+      "chg": 10.0,
+      "sector": "人形机器人",
+      "strategy": "突破追击",
+      "tier_score": 0.528,
+      "news": "液压件龙头+机器人关节+涨停 涨停熔断",
+      "limit_up": true,
+      "sentiment": 3,
+      "three_high": 7.5
+    },
+    {
+      "code": "002536",
+      "name": "飞龙股份",
+      "tier": 3,
+      "price": 51.96,
+      "chg": 9.99,
+      "sector": "人形机器人",
+      "strategy": "突破追击",
+      "tier_score": 0.478,
+      "news": "机器人热管理+新能源车双主线 涨停熔断",
+      "limit_up": true,
+      "sentiment": 3,
+      "three_high": 7.5
+    },
+    {
+      "code": "300607",
+      "name": "拓斯达",
+      "tier": 3,
+      "price": 52.96,
+      "chg": 13.55,
+      "sector": "工业机器人",
+      "strategy": "突破追击",
+      "tier_score": 0.459,
+      "news": "工业机器人+自动化+涨停 涨停熔断",
+      "limit_up": true,
+      "sentiment": 3,
+      "three_high": 6.5
+    },
+    {
+      "code": "002353",
+      "name": "杰瑞股份",
+      "tier": 3,
+      "price": 161.46,
+      "chg": 10.0,
+      "sector": "油服",
+      "strategy": "突破追击",
+      "tier_score": 0.43,
+      "news": "油气设备龙头+能源安全+涨停 涨停熔断",
+      "limit_up": true,
+      "sentiment": 3,
+      "three_high": 5.0
+    }
+  ],
+  "us_gainers": [
+    {
+      "rank": 1,
+      "ticker": "CLRO",
+      "company": "ClearOne(->Cortigent)",
+      "chg": 101.24,
+      "price": "6.48",
+      "driver": "反向并购Vivani Medical脑机接口公司Cortigent",
+      "theme": "脑机接口/神经调控",
+      "a_stocks": "脑机接口概念(暂无直接A股映射)",
+      "confirm": "弱确认",
+      "confirm_text": "国内脑机接口暂无联动新闻"
+    },
+    {
+      "rank": 2,
+      "ticker": "CWD",
+      "company": "CaliberCos",
+      "chg": 90.7,
+      "price": "1.23",
+      "driver": "集成Chainlink推进房地产基金代币化(RWA)",
+      "theme": "区块链/RWA/数字资产",
+      "a_stocks": "区块链概念(四方精创/先进数通等)",
+      "confirm": "弱确认",
+      "confirm_text": "区块链RWA概念A股联动弱"
+    },
+    {
+      "rank": 3,
+      "ticker": "YRD",
+      "company": "宜人智科",
+      "chg": 59.65,
+      "price": "1.44",
+      "driver": "20亿美元回购+Q1 EPS翻倍+AI平台转型",
+      "theme": "金融科技/中概股",
+      "a_stocks": "金融科技(恒生电子/同花顺等)",
+      "confirm": "弱确认",
+      "confirm_text": "中概金融科技回购利好情绪传导有限"
+    }
+  ],
+  "supply_chain": {
+    "has_data": true,
+    "top_segment": "减速器(谐波/RV) 三高评分9.1 + 丝杠(行星滚柱) 三高评分8.8",
+    "nodes": [
+      {
+        "name": "减速器(谐波/RV)",
+        "tier": "上游核心",
+        "growth": "45%",
+        "margin": "40-55%",
+        "barrier": "极高",
+        "three_high": 9.1,
+        "leaders": "绿的谐波/双环传动/中大力德"
+      },
+      {
+        "name": "丝杠(行星滚柱)",
+        "tier": "上游核心",
+        "growth": "50%",
+        "margin": "35-50%",
+        "barrier": "极高",
+        "three_high": 8.8,
+        "leaders": "恒立液压/贝斯特/长盛轴承"
+      },
+      {
+        "name": "控制器/芯片",
+        "tier": "中游",
+        "growth": "35%",
+        "margin": "45-65%",
+        "barrier": "高",
+        "three_high": 8.5,
+        "leaders": "埃斯顿/拓斯达"
+      },
+      {
+        "name": "力传感器",
+        "tier": "上游",
+        "growth": "40%",
+        "margin": "35-50%",
+        "barrier": "高",
+        "three_high": 8.2,
+        "leaders": "柯力传感/瀚川智能"
+      },
+      {
+        "name": "伺服电机",
+        "tier": "上游",
+        "growth": "30%",
+        "margin": "28-38%",
+        "barrier": "高",
+        "three_high": 7.8,
+        "leaders": "汇川技术/步科股份/雷赛智能"
+      },
+      {
+        "name": "本体集成",
+        "tier": "中游",
+        "growth": "60%",
+        "margin": "20-30%",
+        "barrier": "中",
+        "three_high": 6.5,
+        "leaders": "埃斯顿/优必选/傅利叶"
+      }
+    ],
+    "summary": "人形机器人产业链BOM拆解：上游核心零部件(减速器/丝杠/伺服)三高评分最高(7.8-9.1)，国产化率突破75%。政策驱动(2026年底万台级规模)+特斯拉100万台产能规划+宇树IPO，三力共振。减速器和丝杠环节壁垒极高，毛利率40-55%，是产业链最肥美环节。"
+  },
+  "outlook": [
+    {
+      "title": "人形机器人：产业爆发前夜",
+      "desc": "特斯拉Optimus产线投产(年产能100万台)+宇树IPO注册生效(104天创纪录)+工信部国资委联合发文。50+涨停潮后短期分化，优先关注上游核心零部件(减速器/丝杠/伺服)三高环节龙头。",
+      "style": "bullish"
+    },
+    {
+      "title": "半导体/存储：结构性机会",
+      "desc": "Meta算力外售引发短期恐慌，但存储涨价(DDR4/NAND/NOR全线走强)+国产替代+华为麒麟流片验证，产业逻辑未破坏。资金逆势净流入47亿+，调整后龙头更具性价比。",
+      "style": "bullish"
+    },
+    {
+      "title": "风险提示：科技股高估值分化",
+      "desc": "Meta AI落地不及预期+费城半导体大跌5.44%+监管密集风险提示(半导体/电子材料/MLCC)。纯题材股将面临估值挤压，关注订单、产能、壁垒三要素过硬的龙头。",
+      "style": "caution"
+    }
+  ],
+  "strategies": [
+    "T1标的(普冉/京仪/中芯/寒武纪)：催化剂清晰+三高环节龙头，可择机建仓，普冉优先(存储涨价最确定)",
+    "T3人形机器人涨停股：涨停熔断规则强制T3，但基本面得分高，等待次日竞价强度确认，高开3%以内可轻仓参与，优先埃斯顿(4天3板龙头)+双环传动(RV减速器)",
+    "T2回调低吸标的(格科微/长电/有研硅/金宏)：前期涨停后技术回调，等待缩量企稳信号，分批低吸",
+    "板块配置建议：人形机器人40% + 半导体/存储40% + 电力防御10% + 现金10%"
+  ],
+  "overheat_warnings": [
+    {
+      "sector": "人形机器人",
+      "count": 8,
+      "ratio": 0.36,
+      "affected_codes": "002747,300718,002472,300660,300580,601100,002536,688160"
+    }
+  ],
+  "sectors": [
+    {
+      "name": "人形机器人",
+      "chg": 12.5
+    },
+    {
+      "name": "半导体设备",
+      "chg": 8.2
+    },
+    {
+      "name": "存储芯片",
+      "chg": 6.8
+    },
+    {
+      "name": "AI芯片",
+      "chg": 3.5
+    },
+    {
+      "name": "晶圆代工",
+      "chg": 2.1
+    },
+    {
+      "name": "封测",
+      "chg": 1.8
+    },
+    {
+      "name": "电力",
+      "chg": 1.5
+    },
+    {
+      "name": "模拟芯片",
+      "chg": 0.5
+    }
+  ]
+}

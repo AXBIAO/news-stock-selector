@@ -12,3 +12,4 @@ __pycache__/
 # Planning artifacts
 task_plan.md
 progress.md
+.tmp/

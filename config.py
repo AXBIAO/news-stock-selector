@@ -8,6 +8,11 @@ from types import MappingProxyType
 # 未配置时 data_sources.py 的 TuShare Pro 层自动降级跳过
 TUSHARE_TOKEN = os.environ.get("TUSHARE_TOKEN", "")
 TUSHARE_HTTP_URL = os.environ.get("TUSHARE_HTTP_URL", "")
+
+# Alpha Vantage API key for US stock gainers/losers data
+# Free tier: 5 calls/min, 500 calls/day. Get key at https://www.alphavantage.co/support/#api-key
+ALPHA_VANTAGE_API_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY", "")
+
 TUSHARE_ENABLED = True
 
 REPORT_DIR = os.environ.get("NEWS_STOCK_REPORT_DIR", os.path.join(os.path.expanduser("~"), "新闻选股报告"))
@@ -21,7 +26,6 @@ PROVIDER_LABELS = (
     "eastmoney_quote",
     "tushare_quote",
     "tushare_pro_daily",
-    "mcp_quote",
     "pending",
 )
 

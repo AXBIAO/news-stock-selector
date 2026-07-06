@@ -1,0 +1,145 @@
+{
+  "query": "医药板块明日走势分析 · 持仓决策",
+  "date": "20260702",
+  "stocks": [
+    {
+      "code": "600276", "name": "恒瑞医药", "tier": 1,
+      "price": 53.49, "chg": -0.54, "sector": "创新药",
+      "strategy": "回调低吸", "tier_score": 0.82,
+      "news": "国内创新药龙头，557个药品通过医保初审，创新药占比超1/3；14部门印发高质量发展方案利好创新药",
+      "limit_up": false
+    },
+    {
+      "code": "688331", "name": "百济神州", "tier": 1,
+      "price": 140.45, "chg": 1.04, "sector": "创新药/Biotech",
+      "strategy": "催化剂博弈", "tier_score": 0.78,
+      "news": "国内Biotech领军，泽布替尼全球放量；上半年BD出海四大变化利好创新药出海",
+      "limit_up": false
+    },
+    {
+      "code": "000538", "name": "云南白药", "tier": 2,
+      "price": 48.76, "chg": 1.65, "sector": "中药/消费",
+      "strategy": "趋势持有", "tier_score": 0.65,
+      "news": "中药消费龙头，防御属性突出，今日逆势上涨；国企改革预期",
+      "limit_up": false
+    },
+    {
+      "code": "600085", "name": "同仁堂", "tier": 2,
+      "price": 23.28, "chg": 0.13, "sector": "中药",
+      "strategy": "趋势持有", "tier_score": 0.62,
+      "news": "中药品牌龙头，政策支持中药传承创新；品牌壁垒深厚",
+      "limit_up": false
+    },
+    {
+      "code": "688180", "name": "君实生物", "tier": 2,
+      "price": 36.04, "chg": 0.39, "sector": "创新药",
+      "strategy": "催化剂博弈", "tier_score": 0.68,
+      "news": "PD-1出海放量预期；特瑞普利单抗FDA获批后海外销售加速",
+      "limit_up": false
+    },
+    {
+      "code": "600511", "name": "国药股份", "tier": 2,
+      "price": 26.51, "chg": 1.49, "sector": "医药商业",
+      "strategy": "趋势持有", "tier_score": 0.61,
+      "news": "医药流通龙头，集采常态化下强者恒强；今日资金逆势流入",
+      "limit_up": false
+    },
+    {
+      "code": "300760", "name": "迈瑞医疗", "tier": 2,
+      "price": 139.20, "chg": -1.76, "sector": "医疗器械",
+      "strategy": "回调低吸", "tier_score": 0.72,
+      "news": "医疗器械龙头，全球竞争力强；短期回调不改长期逻辑",
+      "limit_up": false
+    },
+    {
+      "code": "600436", "name": "片仔癀", "tier": 2,
+      "price": 113.80, "chg": -0.85, "sector": "中药",
+      "strategy": "回调低吸", "tier_score": 0.64,
+      "news": "中药品牌龙头，稀缺性突出；短期跟随板块调整",
+      "limit_up": false
+    },
+    {
+      "code": "603259", "name": "药明康德", "tier": 3,
+      "price": 121.30, "chg": -3.12, "sector": "CXO",
+      "strategy": "等待企稳", "tier_score": 0.45,
+      "news": "CXO龙头，今日受板块拖累下跌；CRO 20强榜首；等待地缘风险消化",
+      "limit_up": false
+    },
+    {
+      "code": "300759", "name": "康龙化成", "tier": 3,
+      "price": 29.11, "chg": -2.87, "sector": "CXO",
+      "strategy": "等待企稳", "tier_score": 0.42,
+      "news": "CXO板块今日普遍杀跌，凯莱英-7%领跌；短期需等待情绪企稳",
+      "limit_up": false
+    },
+    {
+      "code": "002821", "name": "凯莱英", "tier": 3,
+      "price": 153.19, "chg": -7.04, "sector": "CXO/CDMO",
+      "strategy": "减仓观望", "tier_score": 0.28,
+      "news": "今日医药板块最大跌幅标的，CDMO行业景气度担忧；建议减仓等企稳",
+      "limit_up": false
+    },
+    {
+      "code": "600196", "name": "复星医药", "tier": 3,
+      "price": 23.03, "chg": -0.39, "sector": "化学制药",
+      "strategy": "观望", "tier_score": 0.48,
+      "news": "综合药企，短期缺乏催化；BD出海和mRNA疫苗是中期看点",
+      "limit_up": false
+    },
+    {
+      "code": "000963", "name": "华东医药", "tier": 3,
+      "price": 29.49, "chg": -0.27, "sector": "化学制药/医美",
+      "strategy": "观望", "tier_score": 0.50,
+      "news": "传统药企转型医美，GLP-1布局；短期缺乏独立催化",
+      "limit_up": false
+    }
+  ],
+  "us_gainers": [],
+  "supply_chain": {
+    "has_data": true,
+    "nodes": [
+      {"name": "创新药研发", "level": "上游", "growth": "25-30%", "margin": "60-80%", "barrier": "极高", "score": 8.7, "leaders": "恒瑞医药、百济神州、君实生物"},
+      {"name": "CXO/CDMO", "level": "中游", "growth": "15-20%", "margin": "30-50%", "barrier": "中高", "score": 6.8, "leaders": "药明康德、康龙化成、凯莱英"},
+      {"name": "医疗器械", "level": "中游", "growth": "18-22%", "margin": "50-65%", "barrier": "高", "score": 7.5, "leaders": "迈瑞医疗、联影医疗"},
+      {"name": "中药消费品", "level": "下游", "growth": "10-15%", "margin": "40-55%", "barrier": "高(品牌)", "score": 6.5, "leaders": "片仔癀、同仁堂、云南白药"},
+      {"name": "医药流通", "level": "下游", "growth": "8-12%", "margin": "5-10%", "barrier": "中", "score": 4.2, "leaders": "国药股份、上海医药"}
+    ],
+    "top_segment": "创新药研发(8.7分)",
+    "summary": "医药板块三高环节：创新药研发(高增长+高壁垒+高利润)领跑全产业链，CXO短期承压但中期景气仍在，医疗器械国产替代空间大，中药品牌消费属性提供防御价值。当前市场风格偏向科技成长，医药板块整体不是市场主线，但结构性的创新药和中药机会值得关注。"
+  },
+  "outlook": [
+    {
+      "title": "政策底已现，市场底待确认",
+      "desc": "14部门《医药产业高质量发展实施方案》是重量级政策利好，557药品通过医保初审印证创新药导向。但资金面医药非市场主线，需要时间发酵。",
+      "style": "neutral"
+    },
+    {
+      "title": "CXO短期承压，分化加剧",
+      "desc": "凯莱英-7%、药明康德-3%显示CXO板块今日遭遇抛售。可能原因：①中报业绩担忧 ②地缘政治风险再起 ③前期获利盘兑现。建议CXO仓位减仓观望。",
+      "style": "caution"
+    },
+    {
+      "title": "中药+创新药是避风港",
+      "desc": "云南白药+1.65%、国药股份+1.49%逆势上涨，中药消费属性获资金青睐。百济神州+1.04%显示创新药龙头韧性。持仓中中药股可继续持有。",
+      "style": "bullish"
+    }
+  ],
+  "strategies": [
+    "CXO仓位(凯莱英/药明康德/康龙化成)：建议减仓或清仓，等板块情绪企稳后再考虑回补",
+    "创新药(恒瑞/百济/君实)：继续持有，政策利好+研发管线是中期支撑",
+    "中药(白药/同仁堂/片仔癀)：防御价值突出，可继续持有甚至逢低加仓",
+    "器械(迈瑞/联影)：短期随大盘调整，中期逻辑不变，持仓者可观望",
+    "整体医药仓位：建议控制在总仓位20%以内，非市场主线不重仓"
+  ],
+  "overheat_warnings": [
+    {"sector": "CXO", "count": 3, "ratio": 0.23}
+  ],
+  "sectors": [
+    {"name": "创新药", "chg": 0.3},
+    {"name": "CXO", "chg": -4.3},
+    {"name": "中药", "chg": 0.3},
+    {"name": "医疗器械", "chg": -0.9},
+    {"name": "化学制药", "chg": -0.3},
+    {"name": "医药商业", "chg": 1.5}
+  ]
+}

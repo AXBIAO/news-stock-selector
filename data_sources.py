@@ -20,7 +20,7 @@
 ⚠️ 如果显示 Token 不对，请确保包含上面这行 http_url 设置
 """
 
-from config import TUSHARE_TOKEN, TUSHARE_HTTP_URL, TUSHARE_ENABLED
+from config import TUSHARE_TOKEN, TUSHARE_HTTP_URL, TUSHARE_ENABLED, ALPHA_VANTAGE_API_KEY
 from contracts import FallbackRecord, FieldStatus
 
 # ============================================================
@@ -535,6 +535,7 @@ def _fetch_eastmoney_direct(code: str) -> dict:
 # 股票代码到行业的映射（借鉴UZI-Skill，最后兜底用）
 # ============================================================
 
+# TODO: 将来可提取到独立数据文件（如 sector_map.json），避免硬编码在代码中
 _STOCK_INDUSTRY_MAP: dict[str, str] = {
     # 光学光电子
     "002273": "光学光电子", "002281": "光学光电子", "300433": "光学光电子",
@@ -632,6 +633,62 @@ def _concurrent_fetch(codes: list[str], fetcher, label: str, logger) -> dict[str
             except Exception:
                 pass
     return results
+
+
+def get_stock_valuation(codes: list[str]) -> dict:
+    """获取A股估值数据 (PE/PB/市值/换手率)。
+
+    Fallback 链: 雪球 → 腾讯qt → None
+
+    Returns:
+        {code: {pe_ttm, pb, market_cap, circ_market_cap, turnover_rate, _source}}
+    """
+    result: dict[str, dict] = {}
+    pending = set(codes)
+
+    # Level 1: 雪球 (字段最全: PE + 市值 + 换手率)
+    for code in list(pending):
+        d = _fetch_xueqiu_spot(code)
+        if d and d.get("price"):
+            mcap_str = d.get("market_cap", "")
+            mcap = None
+            if isinstance(mcap_str, str) and mcap_str.endswith("亿"):
+                try:
+                    mcap = float(mcap_str[:-1])
+                except (ValueError, TypeError):
+                    pass
+            circ_str = d.get("circ_market_cap")
+            circ = None
+            if isinstance(circ_str, str) and circ_str.endswith("亿"):
+                try:
+                    circ = float(circ_str[:-1])
+                except (ValueError, TypeError):
+                    pass
+            result[code] = {
+                "pe_ttm": d.get("pe_ttm"),
+                "pb": d.get("pb"),
+                "market_cap": mcap,
+                "circ_market_cap": circ,
+                "turnover_rate": None,
+                "_source": "xueqiu",
+            }
+            pending.discard(code)
+
+    # Level 2: 腾讯qt (补充PE/PB, 无市值)
+    for code in list(pending):
+        d = _fetch_price_tencent_qt("A", code)
+        if d and d.get("price"):
+            result[code] = {
+                "pe_ttm": d.get("pe_ttm"),
+                "pb": d.get("pb"),
+                "market_cap": None,
+                "circ_market_cap": None,
+                "turnover_rate": None,
+                "_source": "tencent-qt",
+            }
+            pending.discard(code)
+
+    return result
 
 
 def get_realtime_quote_fallback(codes: list[str]) -> dict:
@@ -883,7 +940,8 @@ def search_realtime_price_via_web(codes: list[str]) -> dict:
 
 
 # ============================================================
-# 社交热榜相关函数
+# 社交热榜相关函数 (EXPERIMENTAL — 各平台反爬策略频繁变更，成功率不保证)
+# 仅当结果 <5 或用户显式要求情绪热度时触发。失败不影响主链。
 # ============================================================
 
 def fetch_weibo_hot() -> dict:
@@ -1136,6 +1194,865 @@ def fetch_hot_trends(stock_names: list[str]) -> dict:
         'platforms_ok': platforms_ok,
         'hot_trend_mentions': hot_trend_mentions
     }
+
+
+# ============================================================
+# 美股实时涨幅榜 (v3.9)
+# 数据源优先级：yfinance Screener (真实全市场涨幅榜) → 腾讯qt交叉验证 → 腾讯qt扫描池兜底
+# ============================================================
+
+# 美股扫描池 — 仅作为兜底参考，不用于主数据源
+# 当 yfinance Screener 和腾讯qt交叉验证都失败时，用此池并发查询腾讯qt取涨幅排行
+# 选取覆盖科技/金融/消费/能源/医疗/中概的代表性股票
+_US_GAINER_SCAN_POOL = [
+    # — 科技七巨头 + 半导体/AI 核心 —
+    "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA",
+    "AVGO", "AMD", "INTC", "QCOM", "MU", "AMAT", "LRCX", "KLAC", "ADI", "TXN",
+    "MRVL", "NVTS", "COHR", "HPE", "STX", "WDC", "SMCI", "DELL", "HPQ",
+    "SNOW", "CRM", "ADBE", "NOW", "ORCL", "PLTR", "CRWD", "PANW", "NET",
+    # — 金融/消费/能源/医疗 代表 —
+    "JPM", "V", "MA", "BAC", "GS", "MS",
+    "XOM", "CVX", "COP", "SLB", "OXY",
+    "WMT", "HD", "MCD", "SBUX", "NKE", "DIS",
+    "LLY", "UNH", "JNJ", "PFE", "ABBV", "MRK",
+    # — 中概/VIE 及其他 —
+    "BABA", "JD", "PDD", "BIDU", "NIO", "BEKE",
+]
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def _fetch_us_gainers_yfinance_screener(limit: int = 25) -> list[dict]:
+    """使用 yfinance Screener 获取全市场真实涨幅榜。
+
+    调用 Yahoo Finance 预置筛选器 'day_gainers'，返回当天全市场
+    真实涨幅最大的股票列表。这是唯一能反映真实市场涨幅排行的数据源。
+
+    筛选条件（Yahoo 预置 'day_gainers'）:
+      - percentchange > 3%
+      - region = us
+      - intradaymarketcap >= 2B USD
+      - intradayprice >= 5 USD
+      - dayvolume > 15000
+
+    Args:
+        limit: 返回前 N 只涨幅最大股票（count 参数，上限 250）
+
+    Returns:
+        list[dict]: 每只股票包含 ticker, company, price, change_pct,
+                    volume, market_cap, _source 字段
+                    失败返回空列表
+    """
+    import yfinance as yf
+
+    try:
+        count = min(limit, 250)
+        response = yf.screen('day_gainers', count=count)
+
+        if not response or 'quotes' not in response:
+            logger.warning("yfinance Screener returned empty response or missing 'quotes'")
+            return []
+
+        quotes = response['quotes']
+        if not quotes:
+            logger.warning("yfinance Screener returned empty quotes list")
+            return []
+
+        results: list[dict] = []
+        for quote in quotes:
+            ticker = quote.get('symbol', '')
+            if not ticker:
+                continue
+
+            company = quote.get('shortName') or quote.get('longName') or ticker
+            price = quote.get('regularMarketPrice')
+            change_pct = quote.get('regularMarketChangePercent')
+            volume = quote.get('regularMarketVolume', 0) or 0
+            market_cap = quote.get('marketCap')
+
+            # 跳过没有价格或涨跌幅的条目
+            if price is None and change_pct is None:
+                continue
+
+            results.append({
+                "ticker": ticker,
+                "company": company,
+                "price": round(float(price), 2) if price is not None else None,
+                "change_pct": round(float(change_pct), 4) if change_pct is not None else None,
+                "volume": int(volume) if volume else 0,
+                "market_cap": int(market_cap) if market_cap else None,
+                "_source": "yfinance-screener",
+            })
+
+        # yfinance screener 默认按涨跌幅排序，但为了确定性再排一次
+        results.sort(key=lambda x: x["change_pct"] if x["change_pct"] is not None else -999, reverse=True)
+        logger.info(f"yfinance Screener: got {len(results)} gainers from market-wide scan")
+        return results
+
+    except ImportError:
+        logger.warning("yfinance not installed; cannot use Screener")
+        return []
+    except Exception as e:
+        logger.warning(f"yfinance Screener failed: {type(e).__name__}: {e}")
+        return []
+
+
+def _fetch_us_gainers_tencent(limit: int = 10) -> list[dict]:
+    """使用腾讯 qt.gtimg.cn 美股接口查询扫描池，按涨跌幅排序取 Top N。
+
+    复用已有的 _fetch_price_tencent_qt("U", ticker) 函数，
+    逐个查询 _US_GAINER_SCAN_POOL 中所有股票，按涨跌幅排序取 Top N。
+    腾讯接口对美股支持良好，无需 API key，无反爬。
+
+    ⚠️ 这是兜底数据源：只能反映扫描池内股票的排行，不是全市场真实涨幅榜。
+    主数据源应为 yfinance Screener 的 'day_gainers'。
+
+    策略：
+      1. 并发查询 _US_GAINER_SCAN_POOL 中所有股票
+      2. 提取 price, change_pct, name
+      3. 按 change_pct 降序排列
+      4. 过滤异常值（change_pct > 100 或 < -100 的明显错误数据）
+
+    Args:
+        limit: 返回前 N 只涨幅最大股票
+
+    Returns:
+        list[dict]: 每只股票包含 ticker, company, price, change_pct,
+                    volume, market_cap, _source 字段
+    """
+    import concurrent.futures
+
+    pool = list(_US_GAINER_SCAN_POOL)
+    if not pool:
+        return []
+
+    results: list[dict] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(_fetch_price_tencent_qt, "U", ticker): ticker for ticker in pool}
+        for future in concurrent.futures.as_completed(futures):
+            ticker = futures[future]
+            try:
+                data = future.result()
+                if data and data.get("price") and data.get("change_pct") is not None:
+                    change_pct = data["change_pct"]
+                    # 过滤异常数据
+                    if abs(change_pct) > 100:
+                        continue
+                    results.append({
+                        "ticker": ticker,
+                        "company": data.get("name") or ticker,
+                        "price": data["price"],
+                        "change_pct": round(change_pct, 2),
+                        "volume": 0,
+                        "market_cap": None,
+                        "_source": "tencent-qt",
+                    })
+            except Exception:
+                pass
+
+    results.sort(key=lambda x: x["change_pct"], reverse=True)
+    logger.info(f"Tencent QT US gainers (scan pool fallback): {len(results)} results from {len(pool)} pool")
+    return results[:limit]
+
+
+def _verify_us_gainer_tencent(ticker: str) -> dict | None:
+    """用腾讯 qt.gtimg.cn 美股接口交叉验证单只股票的实时价格。
+
+    使用已有的 _fetch_price_tencent_qt("U", ticker) 函数。
+
+    Args:
+        ticker: 美股代码，如 'AAPL', 'MSFT'
+
+    Returns:
+        dict | None: {price, change_pct, name, _source: 'tencent-qt'}，失败返回 None
+    """
+    try:
+        data = _fetch_price_tencent_qt("U", ticker)
+        if not data or data.get("price") is None:
+            return None
+        return {
+            "price": data["price"],
+            "change_pct": data.get("change_pct"),
+            "name": data.get("name"),
+            "prev_close": data.get("prev_close"),
+            "_source": "tencent-qt",
+        }
+    except Exception:
+        return None
+
+
+def _cross_verify_yf_gainers_with_tencent(gainers: list[dict]) -> list[dict]:
+    """对 yfinance Screener 返回的涨幅榜，用腾讯qt做交叉验证。
+
+    并发调用 _verify_us_gainer_tencent，将腾讯的价格/涨跌幅/名称合并到结果中。
+    若腾讯数据与 yfinance 数据不一致，记录差异量但不覆盖 yfinance 主值。
+
+    Args:
+        gainers: yfinance Screener 返回的涨幅榜列表
+
+    Returns:
+        list[dict]: 补充了 tencent_price, tencent_change_pct, tencent_name 字段的涨幅榜。
+                    每个条目新增 _verified 布尔字段指示是否通过了交叉验证。
+    """
+    if not gainers:
+        return gainers
+
+    import concurrent.futures
+
+    tickers_to_verify = [g["ticker"] for g in gainers]
+    tencent_data: dict[str, dict] = {}
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = {executor.submit(_verify_us_gainer_tencent, t): t for t in tickers_to_verify}
+        for future in concurrent.futures.as_completed(futures):
+            ticker = futures[future]
+            try:
+                data = future.result()
+                if data:
+                    tencent_data[ticker] = data
+            except Exception:
+                pass
+
+    verified_count = 0
+    for g in gainers:
+        t_data = tencent_data.get(g["ticker"])
+        if t_data:
+            g["tencent_price"] = t_data.get("price")
+            g["tencent_change_pct"] = t_data.get("change_pct")
+            g["_verified"] = True
+            verified_count += 1
+            # 如果 yfinance 没有公司名，用腾讯的数据补上
+            if t_data.get("name") and (not g.get("company") or g["company"] == g["ticker"]):
+                g["company"] = t_data["name"]
+        else:
+            g["_verified"] = False
+
+    logger.info(f"Tencent cross-verification: {verified_count}/{len(gainers)} gainers verified")
+    return gainers
+
+
+def _fetch_us_gainers_tradingview(limit: int = 50) -> list[dict]:
+    """Fetch US stock top gainers from TradingView Scanner API.
+
+    Zero-auth, production-grade endpoint. Data is ~15 min delayed.
+    Returns list of dicts with keys: ticker, company, price, change_pct, volume, market_cap, _source
+    """
+    import json as _json
+    import urllib.request
+    import urllib.parse
+
+    url = "https://scanner.tradingview.com/america/scan"
+    payload = {
+        "symbols": {
+            "query": {"types": []},
+            "tickers": [],
+            "groups": [{"type": "advance", "values": ["america"]}]
+        },
+        "columns": ["name", "close", "change", "change_abs", "volume", "market_cap_basic"],
+        "sort": {"sortBy": "change", "sortOrder": "desc"},
+        "filter": [{"left": "change", "operation": "greater", "right": 0}],
+        "range": [0, limit]
+    }
+
+    try:
+        data = _json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "Origin": "https://www.tradingview.com",
+                "Referer": "https://www.tradingview.com/",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            },
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = _json.loads(resp.read().decode("utf-8"))
+
+        gainers = []
+        for item in result.get("data", []):
+            symbol_full = item.get("s", "")
+            # Strip exchange prefix: "NASDAQ:AAPL" -> "AAPL"
+            ticker = symbol_full.split(":")[-1] if ":" in symbol_full else symbol_full
+            d = item.get("d", [])
+            if len(d) >= 5:
+                gainers.append({
+                    "ticker": ticker,
+                    "company": d[0] if d[0] else ticker,
+                    "price": round(float(d[1]), 2) if d[1] else None,
+                    "change_pct": round(float(d[2]), 4) if d[2] else None,
+                    "change_abs": round(float(d[3]), 4) if len(d) > 3 and d[3] else None,
+                    "volume": int(d[4]) if len(d) > 4 and d[4] else 0,
+                    "market_cap": int(float(d[5])) if len(d) > 5 and d[5] else None,
+                    "_source": "tradingview",
+                })
+
+        gainers.sort(key=lambda x: x.get("change_pct") or 0, reverse=True)
+        logger.info(f"TradingView Scanner: {len(gainers)} US gainers fetched")
+        return gainers[:limit]
+    except Exception as e:
+        logger.warning(f"TradingView Scanner failed: {type(e).__name__}: {e}")
+        return []
+
+
+def _fetch_us_gainers_sina(limit: int = 50) -> list[dict]:
+    """Fetch US stock top gainers from Sina Finance Market_Center API.
+
+    No auth required. Data is ~3-15 seconds delayed.
+    Keys are unquoted JSON — json.loads handles this in Python.
+    """
+    import json as _json
+    import urllib.request
+    import urllib.parse
+
+    url = "http://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData"
+    params = {
+        "page": 1,
+        "num": min(limit, 100),
+        "sort": "changepercent",
+        "asc": 0,
+        "node": "us_all",
+        "_s_r_a": "init",
+    }
+    query_string = urllib.parse.urlencode(params)
+    full_url = f"{url}?{query_string}"
+
+    try:
+        req = urllib.request.Request(full_url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        })
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read().decode("utf-8")
+
+        # Sina returns unquoted-key JSON — json.loads handles it
+        data = _json.loads(raw)
+
+        gainers = []
+        for item in data:
+            gainers.append({
+                "ticker": str(item.get("symbol", "")).upper(),
+                "company": item.get("name", ""),
+                "price": float(item.get("trade", 0)) if item.get("trade") else None,
+                "change_pct": float(item.get("changepercent", 0)) if item.get("changepercent") else None,
+                "change_abs": float(item.get("pricechange", 0)) if item.get("pricechange") else None,
+                "volume": int(float(item.get("volume", 0))) if item.get("volume") else 0,
+                "market_cap": None,
+                "_source": "sina-finance",
+            })
+
+        gainers.sort(key=lambda x: x.get("change_pct") or 0, reverse=True)
+        logger.info(f"Sina Finance: {len(gainers)} US gainers fetched")
+        return gainers[:limit]
+    except Exception as e:
+        logger.warning(f"Sina Finance failed: {type(e).__name__}: {e}")
+        return []
+
+
+def _fetch_us_gainers_eastmoney(limit: int = 50) -> list[dict]:
+    """Fetch US stock top gainers from Eastmoney push2 API.
+
+    Well-documented internal API. Data is ~1-5 seconds delayed.
+    Returns JSONP that needs callback stripping.
+    Fields: f12=code, f14=name, f2=price, f3=change_pct, f4=change_abs, f5=volume
+    """
+    import json as _json
+    import urllib.request
+    import urllib.parse
+
+    url = "http://push2.eastmoney.com/api/qt/clist/get"
+    params = {
+        "pn": 1,
+        "pz": min(limit, 100),
+        "po": 1,
+        "np": 1,
+        "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+        "fltt": 2,
+        "invt": 2,
+        "fid": "f3",
+        "fs": "m:128+t:2,m:128+t:3",
+        "fields": "f2,f3,f4,f5,f6,f12,f14,f15,f16,f17,f18",
+    }
+    query_string = urllib.parse.urlencode(params)
+    full_url = f"{url}?{query_string}"
+
+    try:
+        req = urllib.request.Request(full_url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": "https://quote.eastmoney.com/"
+        })
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read().decode("utf-8")
+
+        # Strip JSONP callback wrapper
+        start = raw.index("{")
+        end = raw.rindex("}") + 1
+        data = _json.loads(raw[start:end])
+
+        gainers = []
+        stocks = data.get("data", {}).get("diff", [])
+        for s in stocks:
+            gainers.append({
+                "ticker": str(s.get("f12", "")).upper(),
+                "company": s.get("f14", ""),
+                "price": float(s.get("f2", 0)) if s.get("f2") not in (None, "-", "") else None,
+                "change_pct": float(s.get("f3", 0)) if s.get("f3") not in (None, "-", "") else None,
+                "change_abs": float(s.get("f4", 0)) if s.get("f4") not in (None, "-", "") else None,
+                "volume": int(float(s.get("f5", 0))) if s.get("f5") not in (None, "-", "") else 0,
+                "market_cap": None,
+                "_source": "eastmoney",
+            })
+
+        gainers.sort(key=lambda x: x.get("change_pct") or 0, reverse=True)
+        logger.info(f"Eastmoney: {len(gainers)} US gainers fetched")
+        return gainers[:limit]
+    except Exception as e:
+        logger.warning(f"Eastmoney failed: {type(e).__name__}: {e}")
+        return []
+
+
+def _to_float(val: str) -> float | None:
+    """Safely convert a stripped string to float, returning None on failure."""
+    if not val or val in ("--", "-", "N/A", ""):
+        return None
+    try:
+        return float(val.strip().replace(",", ""))
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_cn_number(val: str) -> int | float:
+    """Parse Chinese-formatted numbers: 1.06亿 → 106000000, 115.84万 → 1158400."""
+    if not val or val in ("--", "-", ""):
+        return 0
+    val = val.strip().replace(",", "")
+    multiplier = 1
+    if "亿" in val:
+        multiplier = 100000000
+        val = val.replace("亿", "")
+    elif "万" in val:
+        multiplier = 10000
+        val = val.replace("万", "")
+    try:
+        return int(float(val) * multiplier)
+    except (ValueError, TypeError):
+        return 0
+
+
+def _fetch_us_gainers_10jqka(limit: int = 50) -> list[dict]:
+    """Fetch US stock top gainers from 10jqka (同花顺) detailDefer page.
+
+    Scrapes the server-rendered HTML table from:
+    https://q.10jqka.com.cn/usa/detailDefer
+
+    The page displays all US stocks sorted by 涨跌幅(%) descending by default.
+    Table columns: 序号, 代码, 名称, 现价, 涨跌幅(%), 涨跌, 换手(%), 成交量,
+                   市盈率(%), 成交额, 52周最高, 52周最低
+
+    Returns list of dicts with: ticker, company, price, change_pct, change_abs,
+    turnover_rate, volume, pe_ratio, amount, high_52w, low_52w, _source
+    """
+    import html as _html
+    import re as _re
+    import urllib.request
+
+    url = "https://q.10jqka.com.cn/usa/detailDefer"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    }
+
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw_bytes = resp.read()
+            # 同花顺页面使用 GBK 编码，优先尝试；UTF-8 兜底
+            try:
+                raw = raw_bytes.decode("gbk")
+            except (UnicodeDecodeError, LookupError):
+                raw = raw_bytes.decode("utf-8", errors="replace")
+
+        # Parse each <tr> that contains data cells.
+        # Cell structure: rank, ticker<a>, name<a>, price, change%, change_amt,
+        #                 turnover%, volume, PE, amount, 52w_high, 52w_low
+        trs = _re.findall(r'<tr[^>]*>(.*?)</tr>', raw, _re.DOTALL | _re.IGNORECASE)
+        if not trs:
+            logger.warning("10jqka: no <tr> elements found in HTML")
+            return []
+
+        gainers = []
+        for tr_html in trs:
+            tds = _re.findall(r'<td[^>]*>(.*?)</td>', tr_html, _re.DOTALL)
+            if len(tds) < 10:
+                continue
+
+            try:
+                rank_str = _re.sub(r'<[^>]+>', '', tds[0]).strip()
+                if not rank_str.isdigit():
+                    continue  # skip header row
+                rank = int(rank_str)
+
+                # Extract ticker: <a href="...">TICKER</a>
+                ticker = _re.sub(r'<[^>]+>', '', tds[1]).strip().upper()
+                if not ticker or not ticker[0].isalpha():
+                    continue
+
+                # Extract company name: <a href="...">Company&#032;Name</a>
+                company_raw = _re.sub(r'<[^>]+>', '', tds[2]).strip()
+                company = _html.unescape(company_raw).replace("&#032;", " ")
+
+                price = _to_float(_re.sub(r'<[^>]+>', '', tds[3]))
+                change_pct = _to_float(_re.sub(r'<[^>]+>', '', tds[4]))
+                change_abs = _to_float(_re.sub(r'<[^>]+>', '', tds[5]))
+                turnover_rate = _to_float(_re.sub(r'<[^>]+>', '', tds[6]))
+
+                vol_str = _re.sub(r'<[^>]+>', '', tds[7]).strip()
+                volume = _parse_cn_number(vol_str)
+
+                pe_str = _re.sub(r'<[^>]+>', '', tds[8]).strip()
+                pe_ratio = _to_float(pe_str) if pe_str and pe_str != "--" else None
+
+                amt_str = _re.sub(r'<[^>]+>', '', tds[9]).strip()
+                amount = _parse_cn_number(amt_str)
+
+                high_52w = _to_float(_re.sub(r'<[^>]+>', '', tds[10])) if len(tds) > 10 else None
+                low_52w = _to_float(_re.sub(r'<[^>]+>', '', tds[11])) if len(tds) > 11 else None
+
+                gainers.append({
+                    "ticker": ticker,
+                    "company": company,
+                    "price": price,
+                    "change_pct": change_pct,
+                    "change_abs": change_abs,
+                    "turnover_rate": turnover_rate,
+                    "volume": volume,
+                    "pe_ratio": pe_ratio,
+                    "amount": amount,
+                    "high_52w": high_52w,
+                    "low_52w": low_52w,
+                    "rank": rank,
+                    "_source": "10jqka",
+                })
+            except (ValueError, IndexError, AttributeError) as e:
+                continue
+
+        gainers.sort(key=lambda x: x.get("change_pct") or 0, reverse=True)
+        logger.info(f"10jqka: {len(gainers)} US gainers scraped from detailDefer page")
+        return gainers[:limit]
+    except Exception as e:
+        logger.warning(f"10jqka failed: {type(e).__name__}: {e}")
+        return []
+
+
+def _filter_quality_gainers(
+    gainers: list[dict],
+    min_price: float = 1.0,
+    min_volume: int = 100000,
+    max_change_pct: float = 500,
+    exclude_warrants: bool = True,
+) -> list[dict]:
+    """Filter US gainers to remove penny stocks, warrants, and data anomalies.
+
+    Removes:
+      - Tickers ending in 'W' (warrants / rights)
+      - Price below min_price (penny stocks)
+      - Volume below min_volume (illiquid micro-caps)
+      - |change_pct| exceeding max_change_pct (likely data errors)
+      - Tickers containing '+' (some preferred/warrant variants)
+
+    Args:
+        gainers: list of gainer dicts from any _fetch_us_gainers_* source
+        min_price: minimum stock price in USD (default $1.00)
+        min_volume: minimum daily volume in shares (default 100k)
+        max_change_pct: maximum absolute percentage change (default 500%)
+        exclude_warrants: exclude tickers ending in 'W' (default True)
+
+    Returns:
+        Filtered list, preserving original order
+    """
+    filtered = []
+    removed_counts = {"warrant": 0, "penny": 0, "low_vol": 0, "anomaly": 0}
+
+    for g in gainers:
+        ticker = g.get("ticker", "")
+
+        if exclude_warrants and (ticker.endswith("W") or "+" in ticker):
+            removed_counts["warrant"] += 1
+            continue
+
+        price = g.get("price")
+        if price is not None and price < min_price:
+            removed_counts["penny"] += 1
+            continue
+
+        volume = g.get("volume", 0) or 0
+        if volume < min_volume:
+            removed_counts["low_vol"] += 1
+            continue
+
+        chg = g.get("change_pct")
+        if chg is not None and abs(chg) > max_change_pct:
+            removed_counts["anomaly"] += 1
+            continue
+
+        filtered.append(g)
+
+    if removed_counts:
+        logger.info(
+            f"Quality filter removed: {removed_counts['warrant']} warrants, "
+            f"{removed_counts['penny']} penny stocks, "
+            f"{removed_counts['low_vol']} low-volume, "
+            f"{removed_counts['anomaly']} anomalies "
+            f"→ kept {len(filtered)}/{len(gainers)} gainers"
+        )
+
+    return filtered
+
+
+def _fetch_us_gainers_alphavantage(limit: int = 20) -> list[dict]:
+    """Fetch US stock top gainers from Alpha Vantage API.
+
+    Requires API key (free tier: 5 calls/min, 500 calls/day).
+    Reads ALPHA_VANTAGE_API_KEY from config or env var.
+    Returns top 20 gainers by default (API limit).
+    """
+    import json as _json
+    import urllib.request
+    import urllib.parse
+
+    api_key = ALPHA_VANTAGE_API_KEY
+    url = "https://www.alphavantage.co/query"
+    params = {
+        "function": "TOP_GAINERS_LOSERS",
+        "apikey": api_key,
+    }
+    query_string = urllib.parse.urlencode(params)
+    full_url = f"{url}?{query_string}"
+
+    try:
+        req = urllib.request.Request(full_url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        })
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+
+        # Check for rate limit / error messages
+        if "Note" in data or "Information" in data:
+            logger.warning(f"Alpha Vantage rate limit or info: {data.get('Note', data.get('Information', ''))}")
+            return []
+
+        gainers = []
+        for item in data.get("top_gainers", []):
+            chg_str = str(item.get("change_percentage", "0%")).rstrip("%")
+            gainers.append({
+                "ticker": str(item.get("ticker", "")).upper(),
+                "company": item.get("ticker", ""),
+                "price": float(item.get("price", 0)) if item.get("price") else None,
+                "change_pct": float(chg_str) if chg_str else None,
+                "change_abs": None,
+                "volume": int(item.get("volume", 0)) if item.get("volume") else 0,
+                "market_cap": None,
+                "_source": "alphavantage",
+            })
+
+        gainers.sort(key=lambda x: x.get("change_pct") or 0, reverse=True)
+        logger.info(f"Alpha Vantage: {len(gainers)} US gainers fetched")
+        return gainers[:limit]
+    except Exception as e:
+        logger.warning(f"Alpha Vantage failed: {type(e).__name__}: {e}")
+        return []
+
+
+def get_us_top_gainers(limit: int = 10, quality_filter: bool = True) -> dict:
+    """获取美股实时涨幅榜。
+
+    数据源优先级（v4.1 8-tier fallback chain）:
+      1. yfinance Screener 'day_gainers'      — REAL market-wide top gainers (PRIMARY)
+      2. TradingView Scanner                  — zero-auth scanner API (FALLBACK 1)
+      3. 同花顺 detailDefer                    — scraped HTML table, rich fields (FALLBACK 2)
+      4. 新浪财经 Market_Center                — no-auth GET API (FALLBACK 3)
+      5. 东方财富 push2                        — well-documented internal API (FALLBACK 4)
+      6. Alpha Vantage TOP_GAINERS_LOSERS     — requires API key (FALLBACK 5)
+      7. 腾讯 qt.gtimg.cn 扫描池兜底           — last resort scan pool (FALLBACK 6)
+
+    追加: yfinance Screener 成功后，用腾讯 qt.gtimg.cn 交叉验证每只个股。
+
+    v4.1 新增:
+      - quality_filter=True 时自动过滤: 权证(后缀W/+)、仙股(<$1)、低量(<10万股)、异常值(>500%)
+      - 返回结果中剔除的计数记录在 result['quality_filter'] 中
+
+    每个 fallback 源失败后自动尝试下一个，所有源均失败才返回 pending。
+
+    Args:
+        limit: 返回前 N 只涨幅最大的股票，默认 10
+
+    Returns:
+        dict: {
+            'source': 'yfinance-screener' | 'tradingview' | 'sina-finance' |
+                      'eastmoney' | 'alphavantage' | 'tencent-qt' | 'pending',
+            'gainers': [{ticker, company, price, change_pct, volume, market_cap,
+                         _source, _verified, tencent_price, tencent_change_pct}],
+            'gainers_found': int, 'gainers_missing': int,
+            'fallback_used': bool, 'timestamp': str
+        }
+    """
+    from datetime import datetime, timezone
+
+    result: dict = {
+        "source": "pending",
+        "gainers": [],
+        "gainers_found": 0,
+        "gainers_missing": 0,
+        "fallback_used": False,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+    if limit <= 0:
+        logger.warning("get_us_top_gainers called with limit <= 0")
+        return result
+
+    # 质量过滤统计
+    quality_stats: dict = {"before": 0, "after": 0, "removed_reasons": {}}
+
+    def _apply_quality(gainers: list[dict], req_limit: int) -> list[dict]:
+        """Apply quality filter and return enough gainers to satisfy requested limit."""
+        if not quality_filter:
+            return gainers[:req_limit]
+        quality_stats["before"] = len(gainers)
+        filtered = _filter_quality_gainers(gainers)
+        quality_stats["after"] = len(filtered)
+        quality_stats["removed_reasons"] = {
+            "total_removed": quality_stats["before"] - quality_stats["after"]
+        }
+        return filtered[:req_limit]
+
+    # ========================================================================
+    # 数据源1: yfinance Screener 'day_gainers' (v3.9 主源 — 全市场真实涨幅榜)
+    # ========================================================================
+    yf_screener_gainers: list[dict] = []
+    try:
+        # 取多一些让 Screener 返回足够数据（Screener 通常返回25-50条）
+        fetch_limit = max(limit * 3 if quality_filter else limit, 25)
+        yf_screener_gainers = _fetch_us_gainers_yfinance_screener(fetch_limit)
+    except Exception as e:
+        logger.warning(f"yfinance Screener failed: {type(e).__name__}: {e}")
+
+    if yf_screener_gainers:
+        logger.info(f"yfinance Screener primary source success: {len(yf_screener_gainers)} gainers")
+
+        # ========================================================================
+        # 交叉验证: 腾讯 qt.gtimg.cn 对每只股票做交叉验证
+        # ========================================================================
+        try:
+            yf_screener_gainers = _cross_verify_yf_gainers_with_tencent(yf_screener_gainers)
+        except Exception as e:
+            logger.warning(f"Tencent cross-verification failed (non-fatal): {type(e).__name__}: {e}")
+
+        filtered = _apply_quality(yf_screener_gainers, limit)
+        result["source"] = "yfinance-screener"
+        result["gainers"] = filtered
+        result["gainers_found"] = len(filtered)
+        result["gainers_missing"] = max(0, limit - len(filtered))
+        if quality_filter:
+            result["quality_filter"] = quality_stats
+        return result
+
+    # ========================================================================
+    # Fallback chain: try each source in order until one succeeds (v4.1)
+    # ========================================================================
+    logger.warning("yfinance Screener failed, starting fallback chain")
+    result["fallback_used"] = True
+
+    # --- Fallback 1: TradingView Scanner ---
+    tv_gainers = _fetch_us_gainers_tradingview(limit * 3 if quality_filter else limit)
+    if tv_gainers:
+        filtered = _apply_quality(tv_gainers, limit)
+        result["source"] = "tradingview"
+        result["gainers"] = filtered
+        result["gainers_found"] = len(filtered)
+        result["gainers_missing"] = max(0, limit - len(filtered))
+        if quality_filter:
+            result["quality_filter"] = quality_stats
+        return result
+
+    # --- Fallback 2: 同花顺 detailDefer (v4.1 新增) ---
+    jqka_gainers = _fetch_us_gainers_10jqka(limit * 3 if quality_filter else limit)
+    if jqka_gainers:
+        filtered = _apply_quality(jqka_gainers, limit)
+        result["source"] = "10jqka"
+        result["gainers"] = filtered
+        result["gainers_found"] = len(filtered)
+        result["gainers_missing"] = max(0, limit - len(filtered))
+        if quality_filter:
+            result["quality_filter"] = quality_stats
+        return result
+
+    # --- Fallback 3: Sina Finance ---
+    sina_gainers = _fetch_us_gainers_sina(limit * 3 if quality_filter else limit)
+    if sina_gainers:
+        filtered = _apply_quality(sina_gainers, limit)
+        result["source"] = "sina-finance"
+        result["gainers"] = filtered
+        result["gainers_found"] = len(filtered)
+        result["gainers_missing"] = max(0, limit - len(filtered))
+        if quality_filter:
+            result["quality_filter"] = quality_stats
+        return result
+
+    # --- Fallback 4: Eastmoney ---
+    em_gainers = _fetch_us_gainers_eastmoney(limit * 3 if quality_filter else limit)
+    if em_gainers:
+        filtered = _apply_quality(em_gainers, limit)
+        result["source"] = "eastmoney"
+        result["gainers"] = filtered
+        result["gainers_found"] = len(filtered)
+        result["gainers_missing"] = max(0, limit - len(filtered))
+        if quality_filter:
+            result["quality_filter"] = quality_stats
+        return result
+
+    # --- Fallback 5: Alpha Vantage ---
+    av_gainers = _fetch_us_gainers_alphavantage(limit * 3 if quality_filter else limit)
+    if av_gainers:
+        filtered = _apply_quality(av_gainers, limit)
+        result["source"] = "alphavantage"
+        result["gainers"] = filtered
+        result["gainers_found"] = len(filtered)
+        result["gainers_missing"] = max(0, limit - len(filtered))
+        if quality_filter:
+            result["quality_filter"] = quality_stats
+        return result
+
+    # --- Fallback 6: Tencent QT scan pool (last resort) ---
+    tx_gainers: list[dict] = []
+    try:
+        tx_gainers = _fetch_us_gainers_tencent(limit * 3 if quality_filter else limit)
+    except Exception as e:
+        logger.warning(f"Tencent QT scan pool fallback also failed: {type(e).__name__}: {e}")
+
+    if tx_gainers:
+        logger.info(f"Tencent QT fallback success: {len(tx_gainers)} stocks from scan pool")
+        filtered = _apply_quality(tx_gainers, limit)
+        result["source"] = "tencent-qt"
+        result["gainers"] = filtered
+        result["gainers_found"] = len(filtered)
+        result["gainers_missing"] = max(0, limit - len(filtered))
+        if quality_filter:
+            result["quality_filter"] = quality_stats
+        return result
+
+    # ========================================================================
+    # All data sources failed
+    # ========================================================================
+    logger.warning("All US gainers data sources failed; returning pending")
+    result["source"] = "pending"
+    result["gainers"] = []
+    result["gainers_found"] = 0
+    result["gainers_missing"] = limit
+    return result
 
 
 # ============================================================

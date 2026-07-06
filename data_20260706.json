@@ -1,0 +1,267 @@
+{
+    "query": "2026年7月6日 全市场新闻选股",
+    "date": "20260706",
+    "executive_summary": "存储芯片超级周期主导今日市场：江波龙半年报暴增743倍引爆存储板块，105只个股涨停，半导体国产替代政策持续加码。并购重组活跃（拓荆科技停牌收购、埃斯顿切入具身智能），化工/航运多只周期股业绩翻倍。市场主线明确——AI算力→存储涨价→设备材料国产替代产业链全面爆发。",
+    "stocks": [
+        {
+            "code": "301308", "name": "江波龙", "tier": 1,
+            "price": 681.80, "chg": 10.32, "sector": "存储/半导体",
+            "strategy": "催化剂博弈", "tier_score": 0.951,
+            "catalyst": "业绩超预期", "sentiment": 5,
+            "news": "半年报净利润92-110亿元，同比增长62204%-74394%。DRAM/NAND持续涨价，自研SPU主控芯片突破，与AMD联合调优实现端侧AI DRAM用量降低40%",
+            "limit_up": false
+        },
+        {
+            "code": "688072", "name": "拓荆科技", "tier": 1,
+            "price": 832.00, "chg": 0.00, "sector": "半导体设备",
+            "strategy": "催化剂博弈", "tier_score": 0.885,
+            "catalyst": "并购重组+技术突破", "sentiment": 5,
+            "news": "停牌收购无锡尚积控股权，布局'沉积+刻蚀'双主线。刚完成46亿元定增，Q1归母净利润暴增4.9倍",
+            "limit_up": false
+        },
+        {
+            "code": "002747", "name": "埃斯顿", "tier": 1,
+            "price": 46.03, "chg": 2.81, "sector": "机器人/具身智能",
+            "strategy": "催化剂博弈", "tier_score": 0.872,
+            "catalyst": "并购重组+技术突破", "sentiment": 5,
+            "news": "拟收购具身智能机器人企业埃斯顿酷卓100%股权，正式切入具身智能赛道。连续七年国内工业机器人出货量第一",
+            "limit_up": false
+        },
+        {
+            "code": "600346", "name": "恒力石化", "tier": 2,
+            "price": 18.74, "chg": 5.28, "sector": "石油化工",
+            "strategy": "回调低吸", "tier_score": 0.795,
+            "catalyst": "业绩超预期", "sentiment": 4,
+            "news": "半年报预增136%，净利润72亿元。行业供需格局改善，炼化/PTA/聚酯新材料全产业链协同放量",
+            "limit_up": false
+        },
+        {
+            "code": "000301", "name": "东方盛虹", "tier": 2,
+            "price": 13.81, "chg": 10.04, "sector": "化工新材料",
+            "strategy": "近涨停", "tier_score": 0.788,
+            "catalyst": "业绩超预期", "sentiment": 4,
+            "news": "半年报预增987%-1195%，净利润42-50亿元。拟投资133亿建设芳烃产业链提质增效项目，切入TDI/HDI/聚碳酸酯等高端新材料",
+            "limit_up": true
+        },
+        {
+            "code": "601872", "name": "招商轮船", "tier": 2,
+            "price": 17.68, "chg": 4.00, "sector": "航运/油运",
+            "strategy": "回调低吸", "tier_score": 0.762,
+            "catalyst": "业绩超预期+行业景气", "sentiment": 4,
+            "news": "半年报预增214%-248%，净利润66-73亿元。国际油轮运输市场步入超级周期，油/散/气/车/集全船队协同",
+            "limit_up": false
+        },
+        {
+            "code": "002532", "name": "天山铝业", "tier": 2,
+            "price": 11.61, "chg": 2.11, "sector": "有色金属/铝",
+            "strategy": "回调低吸", "tier_score": 0.735,
+            "catalyst": "业绩超预期+行业景气", "sentiment": 4,
+            "news": "半年报预增101%，净利润42亿元。全球铝行业供需影响，电解铝价格显著上行，140万吨产能项目推进",
+            "limit_up": false
+        },
+        {
+            "code": "688629", "name": "华丰科技", "tier": 2,
+            "price": 201.26, "chg": 11.81, "sector": "半导体封装/连接器",
+            "strategy": "近涨停", "tier_score": 0.728,
+            "catalyst": "技术突破+行业景气", "sentiment": 4,
+            "news": "华为韬定律V2驱动先进封装赛道爆发，196只概念股平均涨74.69%。公司为半导体封装连接器龙头",
+            "limit_up": false
+        },
+        {
+            "code": "301269", "name": "华大九天", "tier": 2,
+            "price": 117.21, "chg": 14.05, "sector": "EDA/半导体",
+            "strategy": "近涨停", "tier_score": 0.715,
+            "catalyst": "政策利好+技术突破", "sentiment": 4,
+            "news": "国产算力替代政策升级：2万亿算力网格计划要求芯片国产占比80%，EDA作为芯片设计核心工具直接受益",
+            "limit_up": false
+        },
+        {
+            "code": "688372", "name": "伟测科技", "tier": 2,
+            "price": 180.88, "chg": 11.45, "sector": "半导体测试",
+            "strategy": "近涨停", "tier_score": 0.702,
+            "catalyst": "行业景气+国产替代", "sentiment": 4,
+            "news": "百亿级先进封测扩产落地，HBM/Chiplet先进封装产能紧缺，头部封测企业订单持续爆满",
+            "limit_up": false
+        },
+        {
+            "code": "002266", "name": "浙富控股", "tier": 3,
+            "price": 5.29, "chg": -0.19, "sector": "环保/清洁能源",
+            "strategy": "回调低吸", "tier_score": 0.652,
+            "catalyst": "业绩超预期", "sentiment": 3,
+            "news": "半年报预增120%-156%，净利润12.5-14.5亿元。双主业（清洁能源+危废处置）协同发力",
+            "limit_up": false
+        },
+        {
+            "code": "600500", "name": "中化国际", "tier": 3,
+            "price": 6.98, "chg": -5.16, "sector": "化工新材料",
+            "strategy": "催化剂博弈", "tier_score": 0.638,
+            "catalyst": "并购重组", "sentiment": 4,
+            "news": "拟21.1亿元收购南通星辰100%股权，绑定四年业绩承诺(2026-2029年归母3.45-3.88亿)，巩固环氧树脂龙头地位",
+            "limit_up": false
+        },
+        {
+            "code": "600105", "name": "永鼎股份", "tier": 3,
+            "price": 50.05, "chg": -8.22, "sector": "光通信/AI算力",
+            "strategy": "回调低吸", "tier_score": 0.625,
+            "catalyst": "业绩超预期+行业景气", "sentiment": 4,
+            "news": "半年报预增57%-120%，净利润5-7亿元。光通信板块受益AI算力需求爆发，光纤市场量价齐升",
+            "limit_up": false
+        },
+        {
+            "code": "688689", "name": "银河微电", "tier": 3,
+            "price": 80.75, "chg": 18.70, "sector": "半导体分立器件",
+            "strategy": "近涨停", "tier_score": 0.598,
+            "catalyst": "行业景气", "sentiment": 3,
+            "news": "20家芯片厂商集体启动新一轮涨价，功率半导体供不应求，产能利用率高位运行",
+            "limit_up": false
+        },
+        {
+            "code": "300684", "name": "中石科技", "tier": 3,
+            "price": 74.41, "chg": 20.00, "sector": "散热/热管理",
+            "strategy": "涨停次日谨慎", "tier_score": 0.585,
+            "catalyst": "概念热点", "sentiment": 3,
+            "news": "AI算力需求推动散热需求激增，液冷/热管理赛道持续受益于数据中心建设",
+            "limit_up": true
+        },
+        {
+            "code": "688206", "name": "概伦电子", "tier": 3,
+            "price": 48.76, "chg": 20.01, "sector": "EDA/半导体",
+            "strategy": "涨停次日谨慎", "tier_score": 0.572,
+            "catalyst": "概念热点+政策利好", "sentiment": 3,
+            "news": "EDA国产替代加速，华为韬定律V2推动三维EDA需求，公司为国产EDA核心标的",
+            "limit_up": true
+        }
+    ],
+    "us_gainers": [
+        {
+            "rank": 1, "ticker": "ABVX", "company": "Abivax SA",
+            "chg": 37.93, "price": 132.62,
+            "driver": "生物科技反弹",
+            "theme": "生物医药", "a_stocks": "无直接映射",
+            "confirm": "无确认", "confirm_text": "生物科技板块与A股关联度低"
+        },
+        {
+            "rank": 2, "ticker": "AMBA", "company": "Ambarella Inc",
+            "chg": 20.48, "price": 80.73,
+            "driver": "AI视觉芯片需求爆发",
+            "theme": "AI视觉芯片", "a_stocks": "603893 瑞芯微, 300458 全志科技, 688256 寒武纪",
+            "confirm": "强确认", "confirm_text": "国内AI芯片政策利好持续，华为韬定律V2发布，端侧AI加速落地"
+        },
+        {
+            "rank": 3, "ticker": "FCEL", "company": "FuelCell Energy",
+            "chg": 19.56, "price": 35.62,
+            "driver": "清洁能源政策利好",
+            "theme": "氢能/燃料电池", "a_stocks": "688339 亿华通, 300228 富瑞特装",
+            "confirm": "弱确认", "confirm_text": "国内氢能政策持续推进但短期无明显催化"
+        },
+        {
+            "rank": 4, "ticker": "HSAI", "company": "Hesai Group",
+            "chg": 16.56, "price": 18.37,
+            "driver": "激光雷达量产交付超预期",
+            "theme": "激光雷达/自动驾驶", "a_stocks": "688167 炬光科技, 002920 德赛西威, 300552 万集科技",
+            "confirm": "强确认", "confirm_text": "国内智能驾驶渗透率快速提升，激光雷达成本下降加速上车"
+        },
+        {
+            "rank": 5, "ticker": "AVAV", "company": "AeroVironment",
+            "chg": 15.34, "price": 160.32,
+            "driver": "美国国防预算增加无人机采购",
+            "theme": "无人机/军工", "a_stocks": "688070 纵横股份, 002985 北摩高科, 600760 中航沈飞",
+            "confirm": "弱确认", "confirm_text": "国内军工无人机需求稳定增长，但无直接对标"
+        },
+        {
+            "rank": 6, "ticker": "OUST", "company": "Ouster Inc",
+            "chg": 13.45, "price": 61.34,
+            "driver": "数字激光雷达订单增长",
+            "theme": "激光雷达", "a_stocks": "688167 炬光科技, 300552 万集科技",
+            "confirm": "弱确认", "confirm_text": "激光雷达行业整体景气度上行"
+        },
+        {
+            "rank": 7, "ticker": "WOLF", "company": "Wolfspeed",
+            "chg": 12.00, "price": 49.55,
+            "driver": "SiC碳化硅需求持续旺盛",
+            "theme": "碳化硅/三代半导体", "a_stocks": "688234 天岳先进, 300623 捷捷微电, 605111 新洁能",
+            "confirm": "强确认", "confirm_text": "国内功率半导体集体涨价，SiC在手订单饱满，车规/光储需求全面旺盛"
+        },
+        {
+            "rank": 8, "ticker": "ONTO", "company": "Onto Innovation",
+            "chg": 8.71, "price": 382.06,
+            "driver": "半导体设备需求强劲",
+            "theme": "半导体设备", "a_stocks": "002371 北方华创, 688012 中微公司, 688072 拓荆科技",
+            "confirm": "强确认", "confirm_text": "韩国存储双雄3700万亿韩元扩产计划启动超级设备周期，国内半导体设备国产化率加速提升"
+        },
+        {
+            "rank": 9, "ticker": "ALAB", "company": "Astera Labs",
+            "chg": 8.09, "price": 492.86,
+            "driver": "AI数据中心连接芯片需求爆发",
+            "theme": "AI芯片/数据中心", "a_stocks": "688256 寒武纪, 688041 海光信息, 688981 中芯国际",
+            "confirm": "强确认", "confirm_text": "2万亿算力网格计划+存储芯片国产替代，AI数据中心全产业链受益"
+        },
+        {
+            "rank": 10, "ticker": "INTC", "company": "Intel Corp",
+            "chg": 6.13, "price": 139.79,
+            "driver": "芯片制造回流+美国政策支持",
+            "theme": "芯片制造", "a_stocks": "688981 中芯国际, 688347 华虹公司",
+            "confirm": "弱确认", "confirm_text": "半导体制造主题映射但无直接订单催化"
+        }
+    ],
+    "supply_chain": {
+        "has_data": true,
+        "top_segment": "存储芯片制造（三高评分 8.9/10）",
+        "summary": "存储芯片产业链BOM拆解：上游→硅片/光刻胶/前驱体(增速25-35%)，中游→存储晶圆制造(增速40-60%)→封装测试(增速20-35%)，下游→模组/SSD(增速30-50%)→AI服务器/端侧AI。三高环节：存储晶圆制造(毛利50-65%,壁垒极高)、先进封装(毛利35-50%,壁垒高)、存储模组品牌(毛利25-45%,壁垒中高)。华为韬定律V2将先进封装推至产业C位。",
+        "nodes": [
+            {"name": "硅片/衬底材料", "level": "上游", "growth": "25%", "margin": "25-35%", "barrier": "中高", "score": 6.8, "leaders": "688126 沪硅产业, 003031 中瓷电子"},
+            {"name": "光刻胶/前驱体", "level": "上游", "growth": "30%", "margin": "40-55%", "barrier": "高", "score": 7.8, "leaders": "300346 南大光电, 300655 晶瑞电材"},
+            {"name": "半导体设备", "level": "上游", "growth": "35%", "margin": "40-55%", "barrier": "极高", "score": 8.5, "leaders": "002371 北方华创, 688012 中微公司, 688072 拓荆科技"},
+            {"name": "存储晶圆制造", "level": "中游", "growth": "50%", "margin": "50-65%", "barrier": "极高", "score": 8.9, "leaders": "688981 中芯国际, 688347 华虹公司"},
+            {"name": "先进封装", "level": "中游", "growth": "35%", "margin": "35-50%", "barrier": "高", "score": 7.9, "leaders": "600584 长电科技, 002156 通富微电, 688629 华丰科技"},
+            {"name": "存储模组/品牌", "level": "下游", "growth": "45%", "margin": "25-45%", "barrier": "中高", "score": 7.5, "leaders": "301308 江波龙, 688525 佰维存储, 603986 兆易创新"},
+            {"name": "AI服务器/端侧AI", "level": "下游", "growth": "60%", "margin": "20-35%", "barrier": "中", "score": 7.2, "leaders": "000977 浪潮信息, 002230 科大讯飞"}
+        ]
+    },
+    "outlook": [
+        {
+            "title": "存储芯片超级周期延续",
+            "desc": "DRAM/NAND Q3合约价预计再涨13-32%，供需紧张至少持续至2028年。江波龙/长鑫科技业绩验证涨价逻辑，板块短期调整是布局良机",
+            "style": "bullish"
+        },
+        {
+            "title": "半导体设备/材料国产替代加速",
+            "desc": "2万亿算力网格+强制80%国产化率，半导体设备订单可见度极高。拓荆科技复牌后有望补涨，北方华创/中微公司调整后性价比凸显",
+            "style": "bullish"
+        },
+        {
+            "title": "警惕短期过热风险",
+            "desc": "今日105只涨停，部分半导体标的短期涨幅过大。存储板块前期大涨后出现分化（兆易创新上周跌停），江波龙涨超10%追高需谨慎",
+            "style": "caution"
+        }
+    ],
+    "strategies": [
+        "核心仓位配置存储模组龙头（江波龙/佰维存储），享受涨价周期红利",
+        "逢低布局半导体设备/材料（拓荆科技复牌后、北方华创、中微公司），等待国产替代订单兑现",
+        "关注并购重组事件驱动（埃斯顿、中化国际），博弈重组过会/复牌补涨",
+        "化工/航运周期股（恒力石化、东方盛虹、招商轮船）作为防御配置，分红+业绩双支撑"
+    ],
+    "sectors": [
+        {"name": "存储芯片", "chg": 2.5},
+        {"name": "半导体设备", "chg": 1.8},
+        {"name": "先进封装", "chg": 3.2},
+        {"name": "化工新材料", "chg": 1.5},
+        {"name": "航运/油运", "chg": 2.0}
+    ],
+    "overheat_warnings": [
+        {"sector": "半导体", "count": 45, "ratio": 0.43, "affected_codes": ["688689","300684","688206","301191","688103","688071"]},
+        {"sector": "EDA/芯片设计", "count": 8, "ratio": 0.08, "affected_codes": ["301269","688206"]}
+    ],
+    "catchup_opportunities": [
+        {"sector": "半导体材料", "leader": "300346 南大光电 +3.2%", "laggard": "300655 晶瑞电材 +0.5%", "gap": "2.7%"},
+        {"sector": "先进封装", "leader": "600584 长电科技 +5.1%", "laggard": "002156 通富微电 +1.2%", "gap": "3.9%"}
+    ],
+    "today_suggestions": {
+        "all_market": ["关注存储板块分化后的低吸机会（江波龙短期涨幅已大）", "半导体设备（拓荆科技复牌后）和材料（南大光电/晶瑞电材）可逢低布局", "化工/航运周期股（恒力石化/招商轮船）业绩确定性强，适合稳健配置"],
+        "main_board": ["恒力石化为代表的主板周期股估值合理，业绩增长确定", "招商轮船国际油运超级周期+高分红，攻守兼备", "永鼎股份光通信+AI算力双轮驱动，短期调整后性价比提升"]
+    },
+    "tomorrow_suggestions": {
+        "all_market": ["关注今日涨停股（东方盛虹/中石科技/概伦电子）次日分歧后的短线机会", "拓荆科技复牌后的补涨空间值得跟踪", "美股半导体（ONTO/AMBA/WOLF）隔夜大涨对A股半导体板块的溢出效应"],
+        "main_board": ["业绩预增公告持续披露，关注晚间新发布的预增标的", "沪指若继续调整，主板低估值周期股（恒力石化/天山铝业）更具防御性"]
+    }
+}
