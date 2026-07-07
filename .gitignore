@@ -13,3 +13,4 @@ __pycache__/
 task_plan.md
 progress.md
 .tmp/
+report_data_*.json

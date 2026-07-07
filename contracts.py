@@ -1,9 +1,13 @@
 # contracts.py — news-stock-selector 统一数据契约
 # skill.md 与 data_sources.py 共享的唯一真源。
+# v5.5: 集成市场状态感知 + 协方差惩罚 + 防御因子
 
 from enum import Enum, IntEnum
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from regime_detector import MarketRegime, RegimeResult
 
 
 class FieldStatus(str, Enum):
@@ -123,7 +127,27 @@ NEAR_LIMIT_UP_PENALTY = 0.80   # tier_score × 0.80
 MARKET_CAUTION_DISCOUNT = 0.85  # 板块过热时全局 tier_score 折扣
 
 # ── v5.4: 独立逻辑加分 ──
-INDEPENDENT_CATALYST_BONUS = 0.08  # 独立于主线的催化剂额外加分
+INDEPENDENT_CATALYST_BONUS = 0.10  # v5.5: 0.08 → 0.10，强化独立逻辑识别
+
+# ── v5.5: 市场状态感知 ──
+# 状态特定权重表定义在 regime_detector.REGIME_WEIGHTS
+DEFAULT_REGIME = "neutral"  # 降级默认
+
+# ── v5.5: 协方差惩罚 ──
+SECTOR_COVARIANCE_PENALTY_CAP = 0.15   # 同板块惩罚上限
+SECTOR_COVARIANCE_WEAKEST_PENALTY = 0.12  # 同板块第4+只惩罚
+MAX_SECTOR_PCT_PER_TIER = 0.40  # Tier 内单板块最大占比
+
+# ── v5.5: Tier 分层阈值（调整后） ──
+# T2 阈值从 0.40 → 0.45，抬高标准减少 T2 板块集中踩雷
+TIER_THRESHOLDS_V55: dict[TierLevel, float] = {
+    TierLevel.T1_STRONG_BUY: 0.72,  # T1 轻微提高
+    TierLevel.T2_WATCH:      0.45,  # 0.40 → 0.45
+    TierLevel.T3_TRACK:      0.10,
+}
+
+# 保持向后兼容：默认使用 v5.4 阈值，v5.5 通过 regime 感知激活
+# 在 compute_tier 中根据 regime 和 use_v55 参数选择阈值表
 
 
 def is_real_limit_up(code: str, chg_pct: float) -> bool:
@@ -409,46 +433,68 @@ def compute_tier(
     sector_frenzy: bool = False,
     market_caution: bool = False,
     independent_catalyst: bool = False,
+    regime: Any = None,           # v5.5: MarketRegime enum
+    quality_factor: float = 0.0,  # v5.5: 防御质量因子 [0, 1]
+    covariance_penalty: float = 0.0,  # v5.5: 同板块集中惩罚
 ) -> tuple[TierLevel, float]:
-    """显式化 tier 分配算法 (v5.4)。
+    """显式化 tier 分配算法 (v5.5 — 市场状态感知)。
 
-    公式: tier_score = sentiment_norm × 0.30 + catalyst_norm × 0.20
-                      + confidence × 0.20 + strategy_norm × 0.10
-                      + three_high_norm × 0.20
-    其中 sentiment_norm = sentiment / 5.0, catalyst_norm = mean(weights),
-    strategy_adj 来自 STRATEGY_TIER_ADJUST, three_high_norm = three_high_bonus / 10.0
+    公式: tier_score = Σ (factor_i × weight_i)
+    权重表根据 market_regime 动态切换（RISK_OFF 强调确定性+防御，ROTATION 强调壁垒+策略）
+
+    v5.5 新增:
+    - regime: 市场状态，切换权重表
+    - quality_factor: RISK_OFF 激活的防御质量评分
+    - covariance_penalty: 同板块集中惩罚（从总分中减去）
 
     v5.4 后处理规则（按优先级）:
-    1. prior_day_limit_up   → 强制 T3 (涨停次日分化风险)
-    2. sector_frenzy        → 强制上限 T2 (板块狂热，全线降级)
-    3. near_limit_up        → score × 0.80 (近涨停但未封板)
-    4. market_caution       → score × 0.85 (板块过热全局折扣)
-    5. independent_catalyst → score + 0.08 (独立逻辑，不与主线同涨跌)
+    1. prior_day_limit_up   → 强制 T3
+    2. sector_frenzy        → 强制上限 T2
+    3. near_limit_up        → score × 0.80
+    4. market_caution       → score × 0.85
+    5. independent_catalyst → score + 0.10 (v5.5: 0.08→0.10)
+    6. v5.5: covariance_penalty → score - penalty
 
     Returns: (assigned_tier, tier_score)
     """
+    # ── v5.5: 加载状态权重 ──
+    try:
+        from regime_detector import MarketRegime as MR, REGIME_WEIGHTS
+        if regime is not None and hasattr(regime, 'value'):
+            weights = REGIME_WEIGHTS.get(regime, REGIME_WEIGHTS.get(MR.NEUTRAL, {}))
+        else:
+            weights = REGIME_WEIGHTS.get(MR.NEUTRAL, {})
+    except ImportError:
+        weights = {"sentiment": 0.30, "catalyst": 0.20, "confidence": 0.20,
+                   "strategy": 0.10, "three_high": 0.20, "quality": 0.00}
+
     sentiment_norm = float(int(sentiment_score)) / 5.0
     cw = [CATALYST_WEIGHTS.get(ct, 0.4) for ct in catalyst_types]
     catalyst_norm = sum(cw) / len(cw) if cw else 0.0
 
     strategy_adj_raw = STRATEGY_TIER_ADJUST.get(strategy_tag, 0) if strategy_tag else 0
-    strategy_norm = (strategy_adj_raw + 1) / 2.0  # map [-1, +1] → [0.0, 1.0]
+    strategy_norm = (strategy_adj_raw + 1) / 2.0
 
-    three_high_norm = three_high_bonus / 10.0   # map [0, 10] → [0.0, 1.0]
+    three_high_norm = three_high_bonus / 10.0
 
+    # ── v5.5: 使用状态权重计算 score ──
     score = round(
-        sentiment_norm * 0.30 + catalyst_norm * 0.20 + confidence * 0.20
-        + strategy_norm * 0.10 + three_high_norm * 0.20,
+        sentiment_norm * weights.get("sentiment", 0.30)
+        + catalyst_norm * weights.get("catalyst", 0.20)
+        + confidence * weights.get("confidence", 0.20)
+        + strategy_norm * weights.get("strategy", 0.10)
+        + three_high_norm * weights.get("three_high", 0.20)
+        + quality_factor * weights.get("quality", 0.00),
         4,
     )
 
-    # ── v5.4 后处理规则（按优先级顺序） ──
+    # ── v5.5 后处理规则（按优先级顺序） ──
 
-    # Rule 1: 涨停次日 → 强制 T3（最严格的保护）
+    # Rule 1: 涨停次日 → 强制 T3
     if prior_day_limit_up and score > TIER_THRESHOLDS[TierLevel.T3_TRACK]:
         return TierLevel.T3_TRACK, score
 
-    # Rule 2: 板块狂热 → 强制上限 T2（板块超20只涨停，全线降级）
+    # Rule 2: 板块狂热 → 强制上限 T2
     if sector_frenzy:
         capped_score = min(score, TIER_THRESHOLDS[TierLevel.T1_STRONG_BUY] - 0.01)
         score = round(capped_score, 4)
@@ -461,14 +507,18 @@ def compute_tier(
     if market_caution:
         score = round(score * MARKET_CAUTION_DISCOUNT, 4)
 
-    # Rule 5: 独立逻辑加分 → tier_score + 0.08
+    # Rule 5: 独立逻辑加分 → tier_score + 0.10 (v5.5)
     if independent_catalyst:
         score = round(min(score + INDEPENDENT_CATALYST_BONUS, 1.0), 4)
 
-    # ── Tier 分配 ──
-    if score >= TIER_THRESHOLDS[TierLevel.T1_STRONG_BUY]:
+    # Rule 6 (v5.5): 同板块集中惩罚
+    if covariance_penalty > 0:
+        score = round(max(0.0, score - covariance_penalty), 4)
+
+    # ── Tier 分配（使用 v5.5 调整后阈值） ──
+    if score >= TIER_THRESHOLDS_V55[TierLevel.T1_STRONG_BUY]:
         return TierLevel.T1_STRONG_BUY, score
-    elif score >= TIER_THRESHOLDS[TierLevel.T2_WATCH]:
+    elif score >= TIER_THRESHOLDS_V55[TierLevel.T2_WATCH]:
         return TierLevel.T2_WATCH, score
     else:
         return TierLevel.T3_TRACK, score
@@ -481,46 +531,96 @@ def compute_tier_for_school(
     strategy_tag: Optional[StrategyTag] = None,
     prior_day_limit_up: bool = False,
     three_high_bonus: float = 0.0,
-    school: Optional[str] = None,   # "value" / "growth" / "event" / etc.
+    school: Optional[str] = None,
     near_limit_up: bool = False,
     sector_frenzy: bool = False,
     market_caution: bool = False,
     independent_catalyst: bool = False,
+    regime: Any = None,              # v5.5
+    quality_factor: float = 0.0,     # v5.5
+    covariance_penalty: float = 0.0, # v5.5
 ) -> tuple[TierLevel, float]:
-    """流派感知的 tier 分配算法 (v5.4)。
+    """流派感知的 tier 分配算法 (v5.5)。
 
     若 school 为 None 或无效，等价于 compute_tier() (事件驱动派默认)。
-    不同流派使用不同的5因子权重 + 催化剂覆盖 + 策略加分 + v5.4 后处理规则。
+    不同流派使用不同的5(+1)因子权重 + 催化剂覆盖 + 策略加分 + v5.5 后处理规则。
+
+    v5.5: 当 regime 为 RISK_OFF 时，流派权重与状态权重融合（取平均），
+    兼顾流派偏好和市场环境。
     """
     if school is None:
         return compute_tier(sentiment_score, catalyst_types, confidence, strategy_tag,
                           prior_day_limit_up, three_high_bonus,
-                          near_limit_up, sector_frenzy, market_caution, independent_catalyst)
+                          near_limit_up, sector_frenzy, market_caution, independent_catalyst,
+                          regime=regime, quality_factor=quality_factor,
+                          covariance_penalty=covariance_penalty)
 
-    # 延迟导入避免循环依赖
     from schools import InvestmentSchool, get_school_config, resolve_school, get_catalyst_weight_for_school
     try:
         sch = resolve_school(school)
     except Exception:
         return compute_tier(sentiment_score, catalyst_types, confidence, strategy_tag,
                           prior_day_limit_up, three_high_bonus,
-                          near_limit_up, sector_frenzy, market_caution, independent_catalyst)
+                          near_limit_up, sector_frenzy, market_caution, independent_catalyst,
+                          regime=regime, quality_factor=quality_factor,
+                          covariance_penalty=covariance_penalty)
 
     cfg = get_school_config(sch)
+
+    # ── v5.5: 加载状态权重 ──
+    try:
+        from regime_detector import MarketRegime as MR, REGIME_WEIGHTS
+        if regime is not None and hasattr(regime, 'value'):
+            r_weights = REGIME_WEIGHTS.get(regime, REGIME_WEIGHTS.get(MR.NEUTRAL, {}))
+        else:
+            r_weights = REGIME_WEIGHTS.get(MR.NEUTRAL, {})
+    except ImportError:
+        r_weights = {"sentiment": 0.30, "catalyst": 0.20, "confidence": 0.20,
+                     "strategy": 0.10, "three_high": 0.20, "quality": 0.00}
+
+    # v5.5: 流派权重与状态权重融合（RISK_OFF 时让状态权重占主导）
+    if regime is not None and hasattr(regime, 'value'):
+        regime_str = regime.value if hasattr(regime, 'value') else str(regime)
+    else:
+        regime_str = "neutral"
+
+    if regime_str == "risk_off":
+        # 避险市：状态权重占 60%，流派权重占 40%
+        w_sentiment  = round(cfg.w_sentiment * 0.4 + r_weights.get("sentiment", 0.30) * 0.6, 2)
+        w_catalyst   = round(cfg.w_catalyst * 0.4 + r_weights.get("catalyst", 0.20) * 0.6, 2)
+        w_confidence = round(cfg.w_confidence * 0.4 + r_weights.get("confidence", 0.20) * 0.6, 2)
+        w_strategy   = round(cfg.w_strategy * 0.4 + r_weights.get("strategy", 0.10) * 0.6, 2)
+        w_three_high = round(cfg.w_three_high * 0.4 + r_weights.get("three_high", 0.20) * 0.6, 2)
+        w_quality    = r_weights.get("quality", 0.20)  # 防御因子完全由状态决定
+    elif regime_str == "rotation":
+        # 轮动市：状态权重占 50%，流派权重占 50%
+        w_sentiment  = round(cfg.w_sentiment * 0.5 + r_weights.get("sentiment", 0.25) * 0.5, 2)
+        w_catalyst   = round(cfg.w_catalyst * 0.5 + r_weights.get("catalyst", 0.15) * 0.5, 2)
+        w_confidence = round(cfg.w_confidence * 0.5 + r_weights.get("confidence", 0.20) * 0.5, 2)
+        w_strategy   = round(cfg.w_strategy * 0.5 + r_weights.get("strategy", 0.15) * 0.5, 2)
+        w_three_high = round(cfg.w_three_high * 0.5 + r_weights.get("three_high", 0.25) * 0.5, 2)
+        w_quality    = 0.0
+    else:
+        # RISK_ON / NEUTRAL: 流派权重占主导
+        w_sentiment  = cfg.w_sentiment
+        w_catalyst   = cfg.w_catalyst
+        w_confidence = cfg.w_confidence
+        w_strategy   = cfg.w_strategy
+        w_three_high = cfg.w_three_high
+        w_quality    = r_weights.get("quality", 0.0)
 
     # 1. 情绪归一化
     sentiment_norm = float(int(sentiment_score)) / 5.0
 
-    # 2. 催化剂归一化 (使用流派覆盖权重)
+    # 2. 催化剂归一化
     if catalyst_types:
         cw = [get_catalyst_weight_for_school(ct.value, sch, CATALYST_WEIGHTS.get(ct, 0.4)) for ct in catalyst_types]
         catalyst_norm = sum(cw) / len(cw) if cw else 0.0
     else:
         catalyst_norm = 0.0
 
-    # 3. 策略归一化 (含流派加分)
+    # 3. 策略归一化
     strategy_adj_raw = STRATEGY_TIER_ADJUST.get(strategy_tag, 0) if strategy_tag else 0
-    # 兼容 Enum 和 string 类型的 strategy_tag
     if hasattr(strategy_tag, 'value'):
         strategy_str = strategy_tag.value
     else:
@@ -529,27 +629,28 @@ def compute_tier_for_school(
     strategy_norm = max(0.0, min(1.0, (strategy_adj_raw + strategy_bonus + 1) / 2.0))
 
     # 4. 三高归一化
-    three_high_norm = three_high_bonus / 10.0  # [0, 10] → [0, 1]
+    three_high_norm = three_high_bonus / 10.0
 
-    # 5. 流派权重加权
+    # 5. v5.5: 状态+流派融合权重计算
     score = round(
-        sentiment_norm * cfg.w_sentiment
-        + catalyst_norm * cfg.w_catalyst
-        + confidence * cfg.w_confidence
-        + strategy_norm * cfg.w_strategy
-        + three_high_norm * cfg.w_three_high,
+        sentiment_norm * w_sentiment
+        + catalyst_norm * w_catalyst
+        + confidence * w_confidence
+        + strategy_norm * w_strategy
+        + three_high_norm * w_three_high
+        + quality_factor * w_quality,
         4,
     )
 
-    # ── v5.4 后处理规则 ──
+    # ── v5.5 后处理规则 ──
 
     # Rule 1: 涨停次日熔断 (投机派豁免)
-    if prior_day_limit_up and cfg.avoid_limit_up and score > TIER_THRESHOLDS[TierLevel.T3_TRACK]:
+    if prior_day_limit_up and cfg.avoid_limit_up and score > TIER_THRESHOLDS_V55[TierLevel.T3_TRACK]:
         return TierLevel.T3_TRACK, score
 
     # Rule 2: 板块狂热 → 强制上限 T2
     if sector_frenzy:
-        capped_score = min(score, TIER_THRESHOLDS[TierLevel.T1_STRONG_BUY] - 0.01)
+        capped_score = min(score, TIER_THRESHOLDS_V55[TierLevel.T1_STRONG_BUY] - 0.01)
         score = round(capped_score, 4)
 
     # Rule 3: 近涨停降权
@@ -564,10 +665,14 @@ def compute_tier_for_school(
     if independent_catalyst:
         score = round(min(score + INDEPENDENT_CATALYST_BONUS, 1.0), 4)
 
+    # Rule 6 (v5.5): 同板块集中惩罚
+    if covariance_penalty > 0:
+        score = round(max(0.0, score - covariance_penalty), 4)
+
     # ── Tier 分配 ──
-    if score >= TIER_THRESHOLDS[TierLevel.T1_STRONG_BUY]:
+    if score >= TIER_THRESHOLDS_V55[TierLevel.T1_STRONG_BUY]:
         return TierLevel.T1_STRONG_BUY, score
-    elif score >= TIER_THRESHOLDS[TierLevel.T2_WATCH]:
+    elif score >= TIER_THRESHOLDS_V55[TierLevel.T2_WATCH]:
         return TierLevel.T2_WATCH, score
     else:
         return TierLevel.T3_TRACK, score
@@ -687,6 +792,104 @@ def compute_independent_catalyst(
             return True
 
     return False
+
+
+# ── v5.5: 协方差感知 + Tier 分散化 ──
+
+def compute_sector_covariance_penalty(
+    stock_sector: Optional[str],
+    same_sector_in_tier: list[str],  # 同 tier 内同板块的股票代码列表
+    stock_code: str,
+) -> float:
+    """计算同板块集中惩罚 [0, SECTOR_COVARIANCE_PENALTY_CAP]。
+
+    同一板块在 Tier 内出现多只股票时，对排名靠后的股票施加惩罚。
+    目的是防止化工双跌停式的板块集中踩雷。
+
+    惩罚表:
+    - 同板块第1只（最强）：无惩罚
+    - 同板块第2只：-0.05
+    - 同板块第3只：-0.08
+    - 同板块第4+只：-0.12
+    """
+    if not stock_sector or len(same_sector_in_tier) < 2:
+        return 0.0
+
+    # 按代码排序确保确定性，找到当前股票在板块内的排名
+    # 排名靠前 = 在列表中靠前（调用方应事先按 score 排序）
+    try:
+        rank = same_sector_in_tier.index(stock_code) + 1
+    except ValueError:
+        return 0.0
+
+    if rank <= 1:
+        return 0.0
+    elif rank == 2:
+        return 0.05
+    elif rank == 3:
+        return 0.08
+    else:
+        return SECTOR_COVARIANCE_WEAKEST_PENALTY
+
+
+def apply_tier_diversification(
+    stocks: list[dict],  # [{code, sector, tier_score, assigned_tier, ...}]
+    max_sector_pct: float = MAX_SECTOR_PCT_PER_TIER,
+) -> list[dict]:
+    """强制 Tier 内板块分散化 (v5.5)。
+
+    规则:
+    1. 同 Tier 内某板块占比 > max_sector_pct 时，降级该板块最弱标的
+    2. 每个 Tier 至少 2 个不同板块（股票数≥2时）
+    3. 降级后按 (assigned_tier, -tier_score) 重排
+
+    Args:
+        stocks: 已分配 tier 的股票列表
+        max_sector_pct: 单板块在 Tier 内的最大占比（默认 40%）
+
+    Returns:
+        调整后的股票列表（原地修改 + 返回）
+    """
+    from collections import Counter
+
+    if len(stocks) < 3:
+        return stocks
+
+    # 按 tier 分组
+    tiers: dict[int, list[dict]] = {1: [], 2: [], 3: []}
+    for s in stocks:
+        t = s.get("assigned_tier", 3)
+        tiers.setdefault(t, []).append(s)
+
+    for tier_level in [1, 2]:
+        tier_stocks = tiers.get(tier_level, [])
+        if len(tier_stocks) < 2:
+            continue
+
+        total = len(tier_stocks)
+        sectors_in_tier = Counter(s.get("sector", "未知") for s in tier_stocks)
+
+        for sector, count in sectors_in_tier.items():
+            if sector == "未知":
+                continue
+            ratio = count / total
+            if ratio > max_sector_pct:
+                sector_stocks = sorted(
+                    [s for s in tier_stocks if s.get("sector") == sector],
+                    key=lambda x: x.get("tier_score", 0),
+                    reverse=True,  # 最高分在前，保留最强的
+                )
+                keep_count = max(1, int(max_sector_pct * total))
+                for s in sector_stocks[keep_count:]:
+                    new_tier = min(3, tier_level + 1)
+                    s["assigned_tier"] = new_tier
+                    s["_diversification_downgrade"] = True
+                    s["_downgrade_reason"] = (
+                        f"板块集中: {sector}在T{tier_level}占比{ratio:.0%}>{max_sector_pct:.0%}"
+                    )
+
+    stocks.sort(key=lambda x: (x.get("assigned_tier", 3), -(x.get("tier_score", 0))))
+    return stocks
 
 
 # ── v4.0: 三高评分计算 ──
