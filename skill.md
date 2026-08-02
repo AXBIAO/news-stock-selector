@@ -1,7 +1,7 @@
 ---
 name: news-stock-selector
-version: "5.1.0"
-description: 新闻选股助手。v5.1 集成通达信本地数据(5537只A股全量扫描，0.6s)，8大投资流派(价值/成长/短线/技术/量化/事件驱动/宏观/投机)，搜索去重复化，流派感知Tier引擎，HTML报告+流派筛选UI。
+version: "5.6.0"
+description: 新闻选股助手。v5.6 优化Tier引擎权重+利好出尽检测+板块集中度强化+反馈闭环修复。v5.1 TDX全市场扫描，8大流派，产业链BOM三高，美股映射，HTML报告。
 markets_supported: ["A", "U"]
 requires:
   mcp_tools: ["mcp__mcp-router__search", "mcp__mcp-router__web_search_exa", "mcp__mcp-router__fetchWebContent", "mcp__mcp-router__search_stock", "mcp__mcp-router__get_kline", "mcp__mcp-router__get_kline_history", "mcp__mcp-router__get_index", "mcp__mcp-router__get_index_all", "mcp__mcp-router__get_market_stats"]
@@ -10,6 +10,7 @@ requires:
 related_skills: ["ftshare-market-data-main", "stock-screener", "lhb-analyzer", "trap-detector", "deep-analysis"]
 note: |
   MCP 行情接口 (get_quote/get_batch_quote/get_stock_info @ localhost:8080) 已废弃。
+  v5.6: Tier引擎权重调优(HOT确定性0.3→0.15, multi_catalyst 1.3→1.15) + 利好出尽检测 + 板块集中度30%→20% + 反馈闭环自动回填(Step 0)。
   v5.1: 通达信本地数据(TDX)集成。5537只A股全量扫描(0.6s)，tdx_reader.py+tdx_scanner.py
   v5.0: 8大投资流派集成(schools.py) + 搜索关键词轮换池 + 流派感知Tier引擎。
   v4.1: 融合 mingli30119/stock-analysis 模板体系。
@@ -108,6 +109,82 @@ tier_score = sentiment_norm × 0.30 + catalyst_norm × 0.20 + confidence × 0.20
 | TYPE_RATING | 机构评级 | 买入、增持、强烈推荐、上调评级、目标价 | 3星 |
 
 ## 执行流程
+
+### Step 0: 前置验证反馈闭环（v5.6 新增 · 非阻塞 · 每次运行前自动执行）
+
+**目的**：在本次选股前，自动回填上一批次选股的次日表现数据，维持反馈环完整。
+
+**CRITICAL**: 此步骤在 Step 1 之前执行，失败不影响主链。
+
+**执行**：
+```bash
+cd "/c/Users/Administrator/.claude/skills/news-stock-selector" && python -c "
+import json, os
+from datetime import datetime, timedelta
+
+feedback_path = '.meta/feedback.jsonl'
+if not os.path.exists(feedback_path):
+    print('no feedback file, skip')
+    exit(0)
+
+# 读取所有反馈记录
+records = []
+with open(feedback_path, 'r', encoding='utf-8') as f:
+    for line in f:
+        try:
+            records.append(json.loads(line.strip()))
+        except:
+            pass
+
+# 找没有 next_day_chg 的历史记录（非当日）
+today = datetime.now().strftime('%Y%m%d')
+pending = [r for r in records if 'next_day_chg' not in r and r.get('date','') < today and 'code' in r]
+print(f'待回填记录: {len(pending)} 条')
+
+if pending:
+    # 收集代码列表
+    codes = list(set(r['code'] for r in pending))
+    
+    # TDX 获取当前行情
+    from tdx_scanner import TDXScanner
+    scanner = TDXScanner()
+    
+    # 从 data_sources 获取历史日线对比
+    from data_sources import tushare_pro_daily_batch
+    daily = tushare_pro_daily_batch(codes)
+    
+    backfilled = 0
+    for r in pending:
+        code = r['code']
+        snap = scanner.all_stocks.get(code)
+        if not snap or not snap.latest_date:
+            continue
+        # 计算从反馈日期到最近交易日的涨跌
+        pick_date = r['date']
+        if code in daily and pick_date in daily[code]:
+            pick_price = daily[code][pick_date]['close']
+            cur_price = snap.latest_close
+            chg = round((cur_price - pick_price) / pick_price * 100, 2)
+            r['next_day_chg'] = chg
+            r['next_day_win'] = chg > 0
+            r['_verified_date'] = snap.latest_date
+            backfilled += 1
+    
+    # 写回
+    with open(feedback_path, 'w', encoding='utf-8') as f:
+        for r in records:
+            f.write(json.dumps(r, ensure_ascii=False) + '\n')
+    print(f'回填完成: {backfilled}/{len(pending)} 条')
+else:
+    print('无待回填记录')
+"
+```
+
+**验证规则**：
+- 仅回填 `date` 早于今日的记录
+- 使用 TDX 最新收盘价 vs 反馈记录中的 `price` 字段（若存在）计算涨跌
+- 若无 pick price 则使用 tushare 日线查找对应日期的收盘价
+- 回填失败标记 `_backfill_failed: true` 并记录原因，不阻塞
 
 ### Step 1: 解析用户意图 + 投资流派选择 (v5.0增强)
 
@@ -791,16 +868,22 @@ from contracts import (
 7. **输出兼容** -- 默认模式输出保持 Markdown 主表格式 + HTML 报告双通道
 8. **HTML 报告强制生成** -- 只要产生了股票数据结果，必须生成 HTML 报告到桌面 (`C:/Users/Administrator/Desktop/新闻选股日报_YYYYMMDD.html`)，并用 `start "" "路径"` 自动打开浏览器。**没有例外路径**——"验证"、"查询"、"分析"等参数变体均不能跳过。如果用户验证的是历史报告（日期非当日），报告标题和内容应注明实际数据日期，但报告仍需生成。
 
-### Step 10: 次日验证反馈环（v3.6 新增 — 非阻塞）
+### Step 10: 次日验证反馈环（v5.6 增强 — 非阻塞）
 
-每次运行后，将 `SelectionResult` 中的 `stocks[].assigned_tier` 和 `stocks[].tier_score` 写入反馈文件：
+每次运行后，将 `SelectionResult` 中的完整选股数据写入反馈文件（含现价，供下次 Step 0 回填验证）：
 
 ```bash
-# 写入 .meta/feedback.jsonl（追加一行 JSON）
-echo '{"date":"YYYYMMDD","code":"000859","assigned_tier":1,"tier_score":0.72}' >> skill/.meta/feedback.jsonl
+# 写入 .meta/feedback.jsonl（追加一行 JSON，v5.6 新增 price/name/strategy_tag/priced_in）
+echo '{"date":"YYYYMMDD","code":"000859","name":"国风新材","assigned_tier":1,"tier_score":0.72,"price":9.30,"strategy_tag":"CATALYST_PLAY","priced_in":false}' >> skill/.meta/feedback.jsonl
 ```
 
-下次运行复盘验证时，读取该文件计算 tier 分配准确性，用于后续权重调优。
+**v5.6 新增字段**：
+- `price`: 选股时的现价，供 Step 0 回填 `next_day_chg` 时计算基准
+- `name`: 股票名称，便于人工复查
+- `strategy_tag`: 策略标签，用于分析哪种策略胜率最高
+- `priced_in`: 是否触发了利好出尽检测（Rule 4），用于评估检测效果
+
+下次运行时 Step 0 自动读取此文件，对缺 `next_day_chg` 的历史记录进行回填验证。
 此步骤失败不影响主链，仅记录 `feedback_status: "skipped"`。
 
 ## 完成前自检清单（CRITICAL — 回应用户前必须逐项确认）
@@ -814,7 +897,7 @@ echo '{"date":"YYYYMMDD","code":"000859","assigned_tier":1,"tier_score":0.72}' >
 | 3 | 浏览器已自动打开 | 已执行 `start "" "路径"` 命令 | 执行打开命令 |
 | 4 | 报告结构完整 | 概览指标卡 + 股票分层表格 + 明日预判卡片 + 策略建议 + 免责声明 全部存在 | 补全缺失区块 |
 | 5 | **v3.6: Tier 引擎已执行** | 每只股票的 `tier_score`, `assigned_tier`, `strategy_tag`, `prior_day_limit_up` 已填充 | 重新执行 Step 8a |
-| 6 | **v3.6: 板块集中度已检查** | `overheat_warnings` 已填充（可为空列表），超 30% 的板块已降权 | 重新执行 Step 8b-8c |
+| 6 | **v5.6: 板块集中度已检查** | `overheat_warnings` 已填充（可为空列表），超 **20%** 的板块已降权，已执行强制分散 | 重新执行 Step 8b-8c |
 | 7 | **v4.1: HTML 用脚本生成** | `gen_report_from_data.py` 成功执行或在无法调用脚本时手动生成的 HTML 文件存在且 > 10KB | 重新执行脚本或手动补全 HTML |
 | 8 | **v3.7: 美股涨幅榜映射已执行（全部Top10）** | `SelectionResult.us_gainers` 已填充全部10只（部分可为"无确认"），HTML 报告中包含美股→A股映射表 | 重新执行 Step 4 |
 | 9 | **v4.0: 产业链BOM拆解+三高已执行** | `SelectionResult.supply_chain_analysis` 已填充（失败时为 None），三高环节龙头已注入 tier 评分，HTML 报告含产业链分析表 | 重新执行 Step 5 |
@@ -825,7 +908,10 @@ echo '{"date":"YYYYMMDD","code":"000859","assigned_tier":1,"tier_score":0.72}' >
 | 14 | **v5.4: 板块狂热已检测** | 全市场涨停扫描已执行，`sector_frenzy` 标记已传入 tier 引擎，狂热板块标的已降级 | 重新执行 Step 8a |
 | 15 | **v5.4: 催化剂确定性权重已应用** | `CATALYST_CERTAINTY` 已参与 `compute_catalyst_confidence()` 计算，HOT 概念权重 0.3 vs EARNINGS 1.0 | 重新执行 Step 8a |
 | 16 | **v5.4: 强制分散已执行** | 板块集中度>30%时，非热点板块补充标的已搜索并添加，independent_catalyst 标记已设置 | 重新执行 Step 8c |
-| 17 | **v5.4: Tier 与预判一致** | 当板块集中度>30%或板块狂热时，`market_caution=True` 已传入 tier 引擎 | 重新执行 Step 8a |
+| 17 | **v5.4: Tier 与预判一致** | 当板块集中度>20%或板块狂热时，`market_caution=True` 已传入 tier 引擎 | 重新执行 Step 8a |
 | 18 | **v5.4: 美股映射质量过滤** | 仅价格≥$5且市值≥$1B的美股执行A股映射，小盘仙股已标记为"无映射价值" | 重新执行 Step 4 |
+| 19 | **v5.6: Step 0 前置验证已执行** | 已尝试读取历史 feedback 并回填 next_day_chg（失败不阻塞） | 记录 skipped，继续主链 |
+| 20 | **v5.6: 利好出尽检测已启用** | `priced_in` 参数已传入 compute_tier，前日涨≥5%且score≥0.85的标的已标记降权 | 重新执行 Step 8a |
+| 21 | **v5.6: 反馈闭环price已写入** | Step 10 写入包含 price/name/strategy_tag/priced_in 字段 | 重新执行 Step 10 |
 
 **此清单是 Step 9 的组成部分，不是独立文档。跳过清单 = 跳过 Step 9 = skill 执行失败。**

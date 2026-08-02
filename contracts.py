@@ -62,13 +62,13 @@ class TierLevel(IntEnum):
 CATALYST_WEIGHTS: dict[CatalystType, float] = {
     CatalystType.POLICY:    1.0,   # 政策利好
     CatalystType.MA:        1.0,   # 并购重组
-    CatalystType.EARNINGS:  0.8,   # 业绩超预期
+    CatalystType.EARNINGS:  0.9,   # 业绩超预期 (v5.6: 0.8→0.9, 验证数据证实确定性最高)
     CatalystType.TECH:      0.8,   # 技术突破
     CatalystType.COOP:      0.7,   # 重要合作
     CatalystType.EQUITY:    0.6,   # 股权变动
     CatalystType.INDUSTRY:  0.5,   # 行业景气
-    CatalystType.HOT:       0.4,   # 概念热点
-    CatalystType.RATING:    0.4,   # 机构评级
+    CatalystType.HOT:       0.3,   # 概念热点 (v5.6: 0.4→0.3, 验证数据证实情绪驱动胜率最低)
+    CatalystType.RATING:    0.3,   # 机构评级 (v5.6: 0.4→0.3)
 }
 
 # ── 策略标签 tier 调整量 ──
@@ -89,7 +89,7 @@ TIER_THRESHOLDS: dict[TierLevel, float] = {
 }
 
 # ── 板块集中度上限 ──
-SECTOR_CONCENTRATION_CAP = 0.30  # 单一板块占比上限
+SECTOR_CONCENTRATION_CAP = 0.20  # v5.6: 0.30→0.20, 验证多次半导体集中>50%踩雷
 
 # ── 催化剂时效衰减（桶边界：≤24h → 1.0, 24-72h → 0.5, >72h → 0.25） ──
 CATALYST_AGE_DECAY: dict[float, float] = {
@@ -111,8 +111,8 @@ CATALYST_CERTAINTY: dict[CatalystType, float] = {
     CatalystType.COOP:      0.7,   # 重要合作 — 中高确定性
     CatalystType.INDUSTRY:  0.5,   # 行业景气 — 中期趋势
     CatalystType.EQUITY:    0.5,   # 股权变动 — 中期信号
-    CatalystType.HOT:       0.3,   # 概念热点 — 低确定性，情绪驱动
-    CatalystType.RATING:    0.3,   # 机构评级 — 低确定性，参考价值有限
+    CatalystType.HOT:       0.15,  # 概念热点 — v5.6: 0.3→0.15, 验证证实纯情绪0.50-0.69区间踩雷率75%
+    CatalystType.RATING:    0.2,   # 机构评级 — v5.6: 0.3→0.2
 }
 
 # ── v5.4: 板块狂热熔断 ──
@@ -128,6 +128,11 @@ MARKET_CAUTION_DISCOUNT = 0.85  # 板块过热时全局 tier_score 折扣
 
 # ── v5.4: 独立逻辑加分 ──
 INDEPENDENT_CATALYST_BONUS = 0.10  # v5.5: 0.08 → 0.10，强化独立逻辑识别
+
+# ── v5.6: 利好出尽（Priced-In）检测 ──
+PRICED_IN_SCORE_THRESHOLD = 0.85   # tier_score ≥ 0.85 触发检查
+PRICED_IN_CHG_THRESHOLD = 5.0      # 前日涨幅 ≥ 5% 触发检查（不含涨停，涨停已被Rule 1熔断）
+PRICED_IN_DISCOUNT = 0.85          # score × 0.85，追高减分
 
 # ── v5.5: 市场状态感知 ──
 # 状态特定权重表定义在 regime_detector.REGIME_WEIGHTS
@@ -418,7 +423,7 @@ def compute_catalyst_confidence(catalyst_types: list[CatalystType], age_hours: f
     base = sum(CATALYST_WEIGHTS.get(ct, 0.4) for ct in catalyst_types) / len(catalyst_types)
     certainty = sum(CATALYST_CERTAINTY.get(ct, 0.4) for ct in catalyst_types) / len(catalyst_types)
     decay = _compute_recency_decay(age_hours)
-    bonus = 1.3 if multi_catalyst else 1.0
+    bonus = 1.15 if multi_catalyst else 1.0  # v5.6: 1.3→1.15, 双催化不等于1.3倍确定性
     return round(min(base * certainty * decay * bonus, 1.0), 4)
 
 
@@ -433,14 +438,18 @@ def compute_tier(
     sector_frenzy: bool = False,
     market_caution: bool = False,
     independent_catalyst: bool = False,
-    regime: Any = None,           # v5.5: MarketRegime enum
-    quality_factor: float = 0.0,  # v5.5: 防御质量因子 [0, 1]
-    covariance_penalty: float = 0.0,  # v5.5: 同板块集中惩罚
+    priced_in: bool = False,         # v5.6: 利好出尽检测
+    regime: Any = None,              # v5.5: MarketRegime enum
+    quality_factor: float = 0.0,     # v5.5: 防御质量因子 [0, 1]
+    covariance_penalty: float = 0.0, # v5.5: 同板块集中惩罚
 ) -> tuple[TierLevel, float]:
-    """显式化 tier 分配算法 (v5.5 — 市场状态感知)。
+    """显式化 tier 分配算法 (v5.6 — 利好出尽检测)。
 
     公式: tier_score = Σ (factor_i × weight_i)
     权重表根据 market_regime 动态切换（RISK_OFF 强调确定性+防御，ROTATION 强调壁垒+策略）
+
+    v5.6 新增:
+    - priced_in: 高score+前日大涨幅 → 利好已price-in，score×0.85
 
     v5.5 新增:
     - regime: 市场状态，切换权重表
@@ -451,9 +460,10 @@ def compute_tier(
     1. prior_day_limit_up   → 强制 T3
     2. sector_frenzy        → 强制上限 T2
     3. near_limit_up        → score × 0.80
-    4. market_caution       → score × 0.85
-    5. independent_catalyst → score + 0.10 (v5.5: 0.08→0.10)
-    6. v5.5: covariance_penalty → score - penalty
+    4. priced_in (v5.6)    → score × 0.85 (高score+前日涨≥5%但未涨停→利好出尽)
+    5. market_caution       → score × 0.85
+    6. independent_catalyst → score + 0.10
+    7. v5.5: covariance_penalty → score - penalty
 
     Returns: (assigned_tier, tier_score)
     """
@@ -503,15 +513,20 @@ def compute_tier(
     if near_limit_up and not prior_day_limit_up:
         score = round(score * NEAR_LIMIT_UP_PENALTY, 4)
 
-    # Rule 4: 板块过热全局折扣 → tier_score × 0.85
+    # Rule 4 (v5.6): 利好出尽检测 → tier_score × 0.85
+    # 高 score + 前日已涨 ≥5%（但未涨停/近涨停）→ 利好已被市场部分消化
+    if priced_in and not prior_day_limit_up and not near_limit_up:
+        score = round(score * PRICED_IN_DISCOUNT, 4)
+
+    # Rule 5: 板块过热全局折扣 → tier_score × 0.85
     if market_caution:
         score = round(score * MARKET_CAUTION_DISCOUNT, 4)
 
-    # Rule 5: 独立逻辑加分 → tier_score + 0.10 (v5.5)
+    # Rule 6: 独立逻辑加分 → tier_score + 0.10
     if independent_catalyst:
         score = round(min(score + INDEPENDENT_CATALYST_BONUS, 1.0), 4)
 
-    # Rule 6 (v5.5): 同板块集中惩罚
+    # Rule 7 (v5.5): 同板块集中惩罚
     if covariance_penalty > 0:
         score = round(max(0.0, score - covariance_penalty), 4)
 
@@ -536,15 +551,17 @@ def compute_tier_for_school(
     sector_frenzy: bool = False,
     market_caution: bool = False,
     independent_catalyst: bool = False,
+    priced_in: bool = False,         # v5.6: 利好出尽检测
     regime: Any = None,              # v5.5
     quality_factor: float = 0.0,     # v5.5
     covariance_penalty: float = 0.0, # v5.5
 ) -> tuple[TierLevel, float]:
-    """流派感知的 tier 分配算法 (v5.5)。
+    """流派感知的 tier 分配算法 (v5.6)。
 
     若 school 为 None 或无效，等价于 compute_tier() (事件驱动派默认)。
-    不同流派使用不同的5(+1)因子权重 + 催化剂覆盖 + 策略加分 + v5.5 后处理规则。
+    不同流派使用不同的5(+1)因子权重 + 催化剂覆盖 + 策略加分 + v5.6 后处理规则。
 
+    v5.6: priced_in 检测高score+前日大涨的利好出尽风险
     v5.5: 当 regime 为 RISK_OFF 时，流派权重与状态权重融合（取平均），
     兼顾流派偏好和市场环境。
     """
@@ -552,6 +569,7 @@ def compute_tier_for_school(
         return compute_tier(sentiment_score, catalyst_types, confidence, strategy_tag,
                           prior_day_limit_up, three_high_bonus,
                           near_limit_up, sector_frenzy, market_caution, independent_catalyst,
+                          priced_in=priced_in,  # v5.6
                           regime=regime, quality_factor=quality_factor,
                           covariance_penalty=covariance_penalty)
 
@@ -562,6 +580,7 @@ def compute_tier_for_school(
         return compute_tier(sentiment_score, catalyst_types, confidence, strategy_tag,
                           prior_day_limit_up, three_high_bonus,
                           near_limit_up, sector_frenzy, market_caution, independent_catalyst,
+                          priced_in=priced_in,  # v5.6
                           regime=regime, quality_factor=quality_factor,
                           covariance_penalty=covariance_penalty)
 
@@ -657,15 +676,19 @@ def compute_tier_for_school(
     if near_limit_up and not prior_day_limit_up:
         score = round(score * NEAR_LIMIT_UP_PENALTY, 4)
 
-    # Rule 4: 市场谨慎折扣
+    # Rule 4 (v5.6): 利好出尽检测
+    if priced_in and not prior_day_limit_up and not near_limit_up:
+        score = round(score * PRICED_IN_DISCOUNT, 4)
+
+    # Rule 5: 市场谨慎折扣
     if market_caution:
         score = round(score * MARKET_CAUTION_DISCOUNT, 4)
 
-    # Rule 5: 独立逻辑加分
+    # Rule 6: 独立逻辑加分
     if independent_catalyst:
         score = round(min(score + INDEPENDENT_CATALYST_BONUS, 1.0), 4)
 
-    # Rule 6 (v5.5): 同板块集中惩罚
+    # Rule 7 (v5.5): 同板块集中惩罚
     if covariance_penalty > 0:
         score = round(max(0.0, score - covariance_penalty), 4)
 
